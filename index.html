@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEAM DR JOSEPH · Diploma Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{--cream:#DED8D1;--warm:#FAF8F4;--border:#DED8D1;--bg:#E9E6E2;--text:#2C2C2C;--light:#A8A09A;--sage:#8A9E85;--red:#C0392B;--sage-bg:#F3F9F5;--sage-border:#C3DAC3;--red-border:#E8D0D0}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:15px}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:300;background:var(--cream);color:var(--text);min-height:100vh}
+  header{background:var(--bg);border-bottom:1px solid var(--border);padding:18px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  main{max-width:1100px;margin:0 auto;padding:16px 24px 48px}
+  .page-label{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:12px}
+  .page-label::after{content:'';flex:1;height:1px;background:var(--text)}
+  .card{background:var(--warm);border:1px solid var(--border);border-radius:2px;margin-bottom:12px;overflow:hidden}
+  .card-head{display:flex;align-items:center;gap:.8rem;padding:0 18px;min-height:42px;border-bottom:1px solid var(--border);background:var(--bg)}
+  .step{width:22px;height:22px;border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.68rem;color:var(--light);flex-shrink:0}
+  .card-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .card-body{padding:18px}
+  .opt-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--light);margin-bottom:6px}
+  .hint{font-size:10px;color:var(--light);margin-top:4px;line-height:1.5}
+  .tog-row{display:flex;border:1px solid var(--border);border-radius:1px;overflow:hidden;width:fit-content}
+  .tog{padding:7px 18px;cursor:pointer;color:var(--text);background:transparent;border:none;border-right:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;transition:background .15s,color .15s;font-family:inherit}
+  .tog:last-child{border-right:none}.tog:hover{background:var(--bg)}.tog.on{background:var(--text);color:#fff}
+  textarea{width:100%;border:1px solid var(--border);background:var(--warm);border-radius:2px;resize:vertical;padding:14px 18px;font-family:inherit;font-size:11px;color:var(--text);line-height:1.7;outline:none;min-height:90px;transition:border-color .15s}
+  textarea:focus{border-color:var(--text)}textarea::placeholder{color:var(--cream)}textarea.done{border-color:var(--sage);background:var(--sage-bg)}
+  input[type=text]{border:1px solid var(--border);border-radius:1px;padding:6px 10px;font-family:inherit;font-size:11px;background:var(--warm);color:var(--text);outline:none;transition:border-color .15s}
+  input[type=text]:focus{border-color:var(--text)}
+  input[type=checkbox]{width:13px;height:13px;accent-color:var(--sage);cursor:pointer}
+  select{border:1px solid var(--border);border-radius:1px;padding:5px 10px;font-size:10px;background:var(--warm);color:var(--text);font-family:inherit;cursor:pointer;outline:none;font-weight:700;letter-spacing:.04em}
+  .btn{display:inline-flex;align-items:center;gap:.35rem;padding:5px 14px;border:1px solid var(--border);border-radius:1px;background:transparent;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .15s;color:var(--text);font-family:inherit}
+  .btn:hover{border-color:var(--text)}.btn:disabled{opacity:.3;cursor:default}
+  .btn-p{background:var(--text);color:#fff;border-color:var(--text);padding:7px 18px}.btn-p:hover:not(:disabled){background:#1a1a1a}
+  .btn-sm{padding:3px 10px;font-size:9px}
+  .badge{display:inline-block;font-size:9px;padding:2px 7px;border-radius:1px;white-space:nowrap;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .b-excl{background:#F5EDED;color:var(--red);border:1px solid var(--red-border)}
+  .b-tdj{background:#FDE8F0;color:#B03070;border:1px solid #E8B8D0}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  thead th{padding:.55rem .9rem;text-align:left;font-weight:700;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--light);border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap}
+  tbody td{padding:.6rem .9rem;border-bottom:1px solid var(--border);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}tbody tr:hover td{background:#F5F3F0}
+  tbody tr.excl{opacity:.4}
+  .stats-bar{display:flex;gap:2rem;align-items:center;padding:.7rem 18px;background:var(--bg);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--light);letter-spacing:.04em;text-transform:uppercase;flex-wrap:wrap}
+  .sn{font-size:1.3rem;font-weight:700;color:var(--text);margin-right:.2rem}
+  .prog-area{padding:1.25rem 18px;display:none}
+  .prog-track{height:2px;background:var(--border);border-radius:1px;margin:.5rem 0}
+  .prog-fill{height:2px;background:var(--sage);border-radius:1px;transition:width .25s;width:0%}
+  .prog-log{font-size:10px;color:var(--light);max-height:120px;overflow-y:auto;font-family:'Courier New',monospace;line-height:1.45}
+  .empty{text-align:center;padding:2.5rem;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cream)}
+  .hidden{display:none!important}
+  .config-row{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);background:#F5F3F0}
+  .config-field{display:flex;flex-direction:column;gap:4px}.config-field.grow{flex:1;min-width:200px}
+  .summary-banner{padding:18px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:28px;align-items:start}
+  .summary-item{display:flex;flex-direction:column;gap:3px}
+  .summary-label{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--light)}
+  .summary-value{font-size:14px;font-weight:700;color:var(--text);letter-spacing:.01em}
+  .summary-value.warn{color:var(--red)}
+  .paper-kornblume{display:inline-block;font-size:11px;padding:4px 12px;background:#ECF3EC;color:#4A7A4A;border:1px solid var(--sage-border);border-radius:1px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .paper-wassernabel{display:inline-block;font-size:11px;padding:4px 12px;background:#EDF2F7;color:#4A7A9B;border:1px solid #C3D8EC;border-radius:1px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .treatment-list{list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+  .treatment-item{font-size:10px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:1px;color:var(--text);display:flex;align-items:center;gap:6px}
+  .treatment-remove{cursor:pointer;color:var(--light);font-size:12px;line-height:1;transition:color .15s}.treatment-remove:hover{color:var(--red)}
+  .treatment-edit{border:none;background:transparent;font-family:inherit;font-size:10px;color:var(--text);outline:none;min-width:60px;padding:0}
+  .add-treatment-row{display:flex;gap:6px;margin-top:8px}
+  .add-treatment-row input{flex:1;font-size:10px;padding:4px 8px}
+  .v-badge{display:inline-block;font-size:8px;padding:2px 6px;background:#ECF3EC;color:#4A7A4A;border:1px solid var(--sage-border);border-radius:1px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-left:8px}
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;display:flex;align-items:center;justify-content:center}
+  .modal{background:var(--warm);border:1px solid var(--border);border-radius:2px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg)}
+  .modal-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .modal-close{cursor:pointer;font-size:18px;color:var(--light);line-height:1;border:none;background:none;font-family:inherit}.modal-close:hover{color:var(--text)}
+  .modal-body{padding:18px;display:flex;flex-direction:column;gap:14px}
+  .modal-row{display:flex;flex-direction:column;gap:5px}
+  .modal-row label{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--light)}
+  .modal-row input,.modal-row select,.modal-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:1px;font-family:inherit;font-size:11px;background:var(--warm);color:var(--text);outline:none}
+  .modal-row input:focus,.modal-row select:focus,.modal-row textarea:focus{border-color:var(--text)}
+  .modal-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:12px">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2171.39 178.81" style="height:18px;width:auto"><g><path d="M2135.2,72.14V2.87h36.19V175.93H2135.2V98.75h-41.46v77.18h-36.19V2.87h36.19V72.14Z"/><path d="M1875.39,2.87h65.18c33.08,0,46,20.14,46,51.76,0,19.67-5.76,50.82-48.2,50.82h-26.83v70.48h-36.18Zm36.18,76h20.13c10.78,0,18.23-11.75,18.23-23.25,0-14.15-3.86-26.12-20.14-26.12h-18.22Z"/><path d="M1707.36,175.93V2.87h94.42V29.48h-58.23V72.14h53.7V98.75h-53.7v50.57h60.17v26.61Z"/><path d="M1573.13,178.81c-44.83,0-53.21-26.39-51.3-56.32H1558c0,16.54.75,30.42,20.62,30.42,12.24,0,18.23-7.89,18.23-19.64,0-31.18-72.86-33.09-72.86-84.62C1524,21.57,1537,0,1581,0c35.25,0,52.72,15.82,50.33,52h-35.21c0-12.94-2.17-26.13-16.8-26.13-11.76,0-18.68,6.47-18.68,18.45,0,32.84,72.86,30,72.86,84.37C1633.53,173.53,1600.71,178.81,1573.13,178.81Z"/><path d="M1330.12,89.4c0-45.78,0-89.4,59.65-89.4s59.69,43.62,59.69,89.4c0,45.29,0,89.41-59.69,89.41S1330.12,134.69,1330.12,89.4Zm82.66,0c0-44.34-2.65-63.52-23-63.52s-23,19.18-23,63.52,2.62,63.51,23,63.51S1412.78,133.75,1412.78,89.4Z"/><path d="M1255.31,2.87V135.66c0,30.2-24.43,43.15-50.1,43.15-50.56,0-52.73-21.11-52.73-60.42h36.94c0,13.9-3.11,34.52,15.79,34.52,8.15,0,13.92-7.45,13.92-14.85V2.87Z"/><path d="M1036.65,88.61h-17.92V2.87h33.12c12.22,0,20.07,7.84,20.07,22.45,0,10.92-4.27,19.12-15.91,21v.24c3.9.48,15.56,1.43,15.56,16.86,0,5.45.35,21.62,2,25.17H1056c-2.37-5.23-1.91-11-1.91-16.62,0-10.22,1-18.89-12.83-18.89h-4.62Zm0-48.69h7.95c7.14,0,9.16-7.12,9.16-12.58,0-8.2-3.46-11.28-9.16-11.28h-7.95Z"/><path d="M873.87,2.87h60.4c47.45,0,56.31,31.65,56.31,85.57,0,26.59,4.09,87.49-57.76,87.49h-59Zm36.19,146.45h17.49c22.06,0,26.35-16.54,26.35-59.92,0-31.88,0-59.92-25.14-59.92h-18.7Z"/><path d="M542.88,175.93V2.87h58.23l27.08,117.67h.48L657.43,2.87h56.32V175.93H678.52V42.43H678l-33.31,133.5H610.22L578.59,42.43h-.49v133.5Z"/><path d="M336,175.93,384,2.87h47.69l47,173.06H440.52l-9.58-38.36H381.57l-9.83,34.36Zm69.77-139.74h-.48L388.76,111h34.51Z"/><path d="M181.45,175.93V2.87h94.42V29.48H217.63V72.14h53.69V98.75H217.63v50.57h60.16v26.61Z"/><path d="M116.72,2.87V31.64H76.45V175.93H40.27V31.64H0V2.87Z"/></g></svg>
+    <span class="v-badge">v1</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="btn" onclick="openQuick()">⚡ Schnellgenerierung</button>
+  </div>
+</header>
+
+<!-- QUICK GENERATE MODAL -->
+<div class="modal-overlay hidden" id="quick-modal" onclick="if(event.target===this)closeQuick()">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Schnellgenerierung</div>
+      <button class="modal-close" onclick="closeQuick()">×</button>
+    </div>
+    <div class="modal-body" id="quick-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeQuick()">Schließen</button>
+      <button class="btn btn-p" onclick="quickGenerate()">Diplom generieren ↓</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="page-label">Diploma Generator</div>
+
+  <!-- STEP 1: Import -->
+  <div class="card">
+    <div class="card-head"><div class="step">1</div><div class="card-title">Daten importieren</div></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <div class="opt-lbl">Teilnehmer-Export (aus ERP)</div>
+        <textarea id="participants-paste" rows="6" placeholder="Export hier einfügen (Strg+V aus ERP) — Academy & In-House werden automatisch erkannt"></textarea>
+      </div>
+      <button class="btn btn-p" onclick="doImport()" style="width:100%;justify-content:center">Importieren</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Config -->
+  <div class="card hidden" id="config-card">
+    <div class="card-head"><div class="step">2</div><div class="card-title">Konfiguration</div></div>
+    <div class="card-body" style="padding:0">
+      <div class="summary-banner">
+        <div class="summary-item"><div class="summary-label">Diplom-Vorlage</div><div class="summary-value" id="sum-diploma">—</div></div>
+        <div class="summary-item"><div class="summary-label">Papier</div><div class="summary-value" id="sum-paper">—</div></div>
+        <div class="summary-item hidden" id="sum-hotel-wrap"><div class="summary-label">Hotel / Location</div><div class="summary-value" id="sum-hotel">—</div></div>
+        <div class="summary-item">
+          <div class="summary-label">Datum</div>
+          <div class="summary-value">
+            <input type="text" id="date-input" value="—" style="font-size:14px;font-weight:700;width:130px;border:1px solid var(--border);border-radius:1px;background:var(--warm);padding:4px 8px;font-family:inherit;color:var(--text);outline:none" onfocus="this.style.borderColor='var(--text)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+        </div>
+      </div>
+      <div class="config-row">
+        <div class="config-field grow">
+          <div class="opt-lbl">Diplom-Vorlage</div>
+          <select id="diploma-select" onchange="onDiplomaChange()" style="width:100%"></select>
+        </div>
+        <div class="config-field">
+          <div class="opt-lbl">Vorlage</div>
+          <div class="tog-row">
+            <button class="tog on" id="tog-print" onclick="setMode('print')">Ohne Herbarium</button>
+            <button class="tog" id="tog-digital" onclick="setMode('digital')">Mit Herbarium</button>
+          </div>
+        </div>
+        <div class="config-field">
+          <div class="opt-lbl">Formularfelder</div>
+          <div class="tog-row">
+            <button class="tog" id="tog-locked" onclick="setLock(true)">Gesperrt</button>
+            <button class="tog on" id="tog-edit" onclick="setLock(false)">Editierbar</button>
+          </div>
+        </div>
+      </div>
+      <!-- Dynamic fields rendered here based on selected diploma -->
+      <div id="dynamic-config"></div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Participants -->
+  <div class="card hidden" id="participants-card">
+    <div class="card-head"><div class="step">3</div><div class="card-title">Teilnehmer</div></div>
+    <div class="stats-bar">
+      <div><span class="sn" id="s-total">0</span> Einträge</div>
+      <div><span class="sn" id="s-sel">0</span> ausgewählt</div>
+      <div><span class="sn" id="s-excl">0</span> ausgeblendet</div>
+    </div>
+    <div style="display:flex;gap:.6rem;align-items:center;padding:.6rem 18px;border-bottom:1px solid var(--border);background:#F5F3F0;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="selectAll(true)">Alle</button>
+      <button class="btn btn-sm" onclick="selectAll(false)">Keine</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-p" id="gen-btn-single" onclick="generate('single')" disabled style="flex-direction:column;align-items:flex-start;gap:1px;padding:6px 18px">
+        <span>Einzeldatei ↓</span>
+        <span style="font-size:8px;font-weight:400;letter-spacing:.03em;text-transform:none;opacity:.75">mit mehreren Seiten</span>
+      </button>
+      <button class="btn" id="gen-btn-zip" onclick="generate('zip')" disabled style="flex-direction:column;align-items:center;gap:1px;padding:6px 18px">
+        <span>ZIP ↓</span>
+        <span style="font-size:8px;font-weight:400;letter-spacing:.03em;text-transform:none;opacity:.75">einzelne Datei pro Person</span>
+      </button>
+    </div>
+    <div><table>
+      <thead><tr>
+        <th style="width:28px"><input type="checkbox" id="chk-all" onchange="toggleAll(this)" checked></th>
+        <th>Teilnehmer</th><th>E-Mail</th><th style="width:95px">Datum</th>
+      </tr></thead>
+      <tbody id="tbl-body"><tr><td colspan="4"><div class="empty">Daten importieren um Teilnehmer anzuzeigen</div></td></tr></tbody>
+    </table></div>
+    <div class="prog-area" id="prog">
+      <div style="font-size:10px;color:var(--light);font-weight:700;text-transform:uppercase;letter-spacing:.04em" id="prog-lbl"></div>
+      <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
+      <div class="prog-log" id="prog-log"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ── MAPPING: ERP-Bezeichnung → Diploma-Vorlage + Papier ── */
+const MAPPING_DATA=[
+  {b:"INFO DAY TEAM DR JOSEPH & THE PERFECT DEVICE",d:"",p:""},
+  {b:"TEAM DR JOSEPH Method",d:"In-House Training",p:"Wassernabel"},
+  {b:"ADVANCED TRAINING COSMETIC KNOW-HOW",d:"",p:""},
+  {b:"THE PERFECT DEVICE",d:"In-House Training",p:"Wassernabel"},
+  {b:"SUPREME EYE + FACE LIFT TREATMENT",d:"Supreme Eye Face Lift Treatment",p:"Kornblume"},
+  {b:"HOLISTIC FACE + BODY RITUAL",d:"Holistic Face Body Ritual",p:"Kornblume"},
+  {b:"SIGNATURE TREATMENT TRAINING",d:"Signature Treatment Training",p:"Kornblume"},
+  {b:"REJUVENATING FACE TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment",p:"Kornblume"},
+  {b:"*REFRESH* TEAM DR JOSEPH Method",d:"In-House Training",p:"Wassernabel"},
+  {b:"*REFRESH* THE PERFECT DEVICE",d:"In-House Training",p:"Wassernabel"},
+  {b:"*REFRESH* SUPREME EYE + FACE LIFT TREATMENT",d:"Supreme Eye Face Lift Treatment",p:"Kornblume"},
+  {b:"*REFRESH* HOLISTIC FACE + BODY RITUAL",d:"Holistic Face Body Ritual",p:"Kornblume"},
+  {b:"*REFRESH* SIGNATURE TREATMENT TRAINING",d:"Signature Treatment Training",p:"Kornblume"},
+  {b:"*REFRESH* REJUVENATING FACE TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment",p:"Kornblume"},
+  {b:"DEEP DIVE: LONGEVITY, SKIN HEALTH + TECHNIQUES",d:"Deep Dive",p:"Kornblume"},
+  {b:"ULTRASONIC REVIVE RITUAL",d:"In-House Training",p:"Wassernabel"},
+  {b:"BLOSSOM ESSENCE FACE TREATMENT",d:"In-House Training",p:"Wassernabel"},
+  {b:"MOMENTS OF HARMONY FOR MOTHERHOOD",d:"In-House Training",p:"Wassernabel"},
+  {b:"HYDRATING TRANQUILITY RITUAL",d:"In-House Training",p:"Wassernabel"},
+  {b:"BOTANICAL SPA HIGHLIGHTS",d:"",p:""},{b:"ACTIVE - METHODS",d:"",p:""},{b:"DETOX - METHODS",d:"",p:""},{b:"RELAX - METHODS",d:"",p:""},
+  {b:"COMPLETE BODY TREATMENT TRAINING",d:"",p:""},{b:"BODY WRAPS",d:"",p:""},
+  {b:"*REFRESH* BOTANICAL SPA HIGHLIGHTS",d:"",p:""},{b:"*REFRESH* ACTIVE - METHODS",d:"",p:""},{b:"*REFRESH* DETOX - METHODS",d:"",p:""},
+  {b:"*REFRESH* RELAX - METHODS",d:"",p:""},{b:"*REFRESH* COMPLETE BODY TREATMENT TRAINING",d:"",p:""},{b:"*REFRESH* BODY WRAPS",d:"",p:""},
+  {b:"THE RENEWAL BODY TREATMENT",d:"",p:""},
+  {b:"DEMONSTRATION - TEAM DR JOSEPH Method",d:"Introduction Training",p:"Kornblume"},
+  {b:"DEMONSTRATION - BODY",d:"Introduction Training",p:"Kornblume"},
+  {b:"DEMONSTRATION - THE PERFECT DEVICE",d:"Introduction Training",p:"Kornblume"},
+  {b:"DEMONSTRATION - SUPREME EYE + FACE LIFT TREATMENT",d:"Introduction Training",p:"Kornblume"},
+  {b:"DEMONSTRATION - REJUVENATING FACE TREATMENT",d:"Introduction Training",p:"Kornblume"},
+  {b:"DEMONSTRATION - HOLISTIC FACE + BODY RITUAL",d:"Introduction Training",p:"Kornblume"},
+  {b:"TRAIN THE TRAINER - SIGNATURE TREATMENT FACE (+TPD)",d:"Signature Treatment Training Theory",p:"Kornblume"},
+  {b:"TRAIN THE TRAINER - COMPLETE BODY TREATMENTS",d:"Complete Body Treatment Training Theory",p:"Wassernabel"},
+  {b:"TRAIN THE TRAINER - SUPREME EYE + FACE LIFT TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory",p:"Kornblume"},
+  {b:"TRAIN THE TRAINER - HOLISTIC FACE + BODY RITUAL",d:"Holistic Face Body Ritual",p:"Kornblume"},
+  {b:"TRAIN THE TRAINER - REJUVENATING FACE TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment",p:"Kornblume"},
+  {b:"TRAIN THE TRAINER - MODULIERTE MASSAGE/KONSTITUTIONSTYPEN",d:"",p:""},
+  {b:"TRAIN THE TRAINER - BEAUTY DAY (FIRST TOUCH TREATMENT)",d:"",p:""},
+  {b:"HIGHTECH INGREDIENTS",d:"In-House Training",p:"Wassernabel"},
+  {b:"PRODUCT + SALES EXPERTISE (ACADEMY)",d:"In-House Training",p:"Wassernabel"},
+  {b:"PRODUCT + SALES EXPERTISE",d:"In-House Training",p:"Wassernabel"},
+  {b:"FROM KNOWLEDGE TO BRAND IMPACT",d:"From Knowledge To Brand Impact",p:"Wassernabel"},
+  {b:"WEBINAR/ONLINE TRAINING",d:"In-House Training",p:"Wassernabel"},
+  {b:"EXKLUSIVES INDIVIDUAL TRAINING Südtirol",d:"Private Training",p:"Wassernabel"},
+  {b:"EMPOWERING RECEPTIONISTS",d:"Empowering Receptionists",p:"Wassernabel"},
+  {b:"CLASSROOM TREATMENT",d:"",p:""},
+  {b:"GESCHICHTE / PHILOSOPHIE / PRODUKTE",d:"Introduction Training",p:"Kornblume"},
+  {b:"Introduction TEAM DR JOSEPH Method",d:"Introduction Training",p:"Kornblume"},
+  {b:"Introduction TEAM DR JOSEPH Body Treatments (Ritual)",d:"Introduction Training",p:"Kornblume"}
+];
+
+const ALL_DIPLOMAS=["Complete Body Treatment Training","Complete Body Treatment Training Theory","Deep Dive","Empowering Receptionists","From Knowledge To Brand Impact","Holistic Face Body Ritual","In-House Training","Individual Training","Individual Training Body","Individual Training Face","Introduction Training","Private Training","Signature Treatment Training","Signature Treatment Training Theory","Supreme Eye Face Lift Treatment","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory"];
+
+const INHOUSE_DIPLOMAS=new Set(["In-House Training","Individual Training","Individual Training Body","Individual Training Face","Introduction Training","Private Training"]);
+
+const DIPLOMA_PAPER={"Complete Body Treatment Training":"Wassernabel","Complete Body Treatment Training Theory":"Wassernabel","Deep Dive":"Kornblume","Empowering Receptionists":"Wassernabel","From Knowledge To Brand Impact":"Wassernabel","Holistic Face Body Ritual":"Kornblume","In-House Training":"Wassernabel","Individual Training":"Kornblume","Individual Training Body":"Wassernabel","Individual Training Face":"Wassernabel","Introduction Training":"Kornblume","Private Training":"Wassernabel","Signature Treatment Training":"Kornblume","Signature Treatment Training Theory":"Kornblume","Supreme Eye Face Lift Treatment":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory":"Kornblume"};
+
+/* Field structure per inhouse template (scanned from actual PDFs) */
+const TEMPLATE_FIELDS={
+  "In-House Training":       {treats:8, hotel:true,  location:false},
+  "Individual Training":     {treats:8, hotel:true,  location:false},
+  "Individual Training Body":{treats:8, hotel:true,  location:false},
+  "Individual Training Face":{treats:8, hotel:true,  location:false},
+  "Introduction Training":   {treats:8, hotel:false, location:true},
+  "Private Training":        {treats:8, hotel:true,  location:false}
+};
+
+/* ── State ── */
+let mode='print', locked=false, rows=[], treatments=[], mapping={};
+let selectedDiploma='', detectedDiploma='', detectedDate='', parsedHotel='';
+const pdfCache={};
+
+/* ── Init ── */
+function init(){
+  MAPPING_DATA.forEach(e=>{
+    if(e.b) mapping[e.b.trim().toLowerCase()]={diploma:e.d||'',paper:e.p||''};
+  });
+  const sel=document.getElementById('diploma-select');
+  sel.innerHTML='<option value="">— automatisch erkannt —</option>';
+  ALL_DIPLOMAS.forEach(d=>{
+    const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);
+  });
+}
+
+/* ── Config toggles ── */
+function setMode(m){
+  mode=m;
+  document.getElementById('tog-print').classList.toggle('on',m==='print');
+  document.getElementById('tog-digital').classList.toggle('on',m==='digital');
+}
+function setLock(l){
+  locked=l;
+  document.getElementById('tog-locked').classList.toggle('on',l);
+  document.getElementById('tog-edit').classList.toggle('on',!l);
+}
+
+/* ── CSV parser (tab-separated, handles quoted fields with embedded tabs/newlines) ── */
+function parseRow(line){
+  const cells=[];let inQ=false,cell='';
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){if(inQ&&line[i+1]==='"'){cell+='"';i++;}else inQ=!inQ;}
+    else if(ch==='\t'&&!inQ){cells.push(cell.trim());cell='';}
+    else cell+=ch;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+/* ── Parse participants export ──
+   Auto-detects Academy vs In-House:
+   - Trainings column has single value → Academy → mapping lookup
+   - Trainings column has pipe-separated values → In-House → treatments extracted automatically
+   - Hotel comes from "Bez Arbeitgeber" or fallback to "Teilnehmer (Kunde)"
+*/
+function parseParticipants(raw){
+  raw=raw.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const lines=raw.split('\n').filter(l=>l.trim());
+  if(lines.length<2)return{rows:[],hotel:'',date:'',treatments:[],isInhouse:false};
+  const header=parseRow(lines[0]);
+  const col=n=>header.findIndex(h=>h.toLowerCase().replace(/\s+/g,' ').includes(n.toLowerCase()));
+
+  const iKunde    = col('teilnehmer (kunde)');
+  const iKontakt  = col('teilnehmer (kontakt)');
+  // Find the standalone Trainings/Trainigs column — must be exact match,
+  // NOT "Vergangene Trainings". Try exact first, then substring fallback.
+  const colExact = n => header.findIndex(h => h.trim().toLowerCase() === n.toLowerCase());
+  let iTrainings = colExact('trainigs');
+  if(iTrainings<0) iTrainings = colExact('trainings');
+  // If still not found, try substring but skip "vergangene trainings"
+  if(iTrainings<0) iTrainings = header.findIndex(h => {
+    const l = h.trim().toLowerCase();
+    return (l.includes('trainigs') || l === 'trainings') && !l.includes('vergangene');
+  });
+  const iEmail    = col('e-mail');
+  const iEmp      = col('bez arbeitgeber');
+  const iCan      = col('abgemeldet');
+  const iDate     = col('ende-datum');
+
+  if(iKunde<0&&iKontakt<0)return{rows:[],hotel:'',date:'',treatments:[],isInhouse:false};
+
+  let hotelName='', firstDate='', detectedTreatments=[], isInhouse=false;
+  const results=[];
+
+  for(let i=1;i<lines.length;i++){
+    const c=parseRow(lines[i]);
+    while(c.length<header.length)c.push('');
+
+    const nameKunde  =(c[iKunde]  ||'').trim();
+    const nameKontakt=(iKontakt>=0?(c[iKontakt]||''):'').trim();
+    const name=nameKontakt||nameKunde;
+    if(!name)continue;
+
+    const date      =(iDate>=0      ?(c[iDate]      ||''):'').trim();
+    const trainings =(iTrainings>=0 ?(c[iTrainings]  ||''):'').trim();
+    const email     =(iEmail>=0     ?(c[iEmail]      ||''):'').trim();
+    const emp       =(iEmp>=0       ?(c[iEmp]        ||''):'').trim();
+    const cancelled =(c[iCan]       ||'').trim().toLowerCase()==='ja';
+    const isTDJ     =email.toLowerCase().endsWith('@teamdrjoseph.com');
+
+    // Detect In-House: pipe-separated treatments in Trainings column
+    if(trainings.includes('|')&&!isInhouse){
+      isInhouse=true;
+      detectedTreatments=trainings.split('|').map(t=>t.trim()).filter(Boolean);
+    }
+
+    // Hotel: prefer "Bez Arbeitgeber", fallback to "Teilnehmer (Kunde)"
+    if(!hotelName) hotelName=emp||nameKunde||'';
+    if(!firstDate&&date) firstDate=date;
+    if(results.some(r=>r.name===name))continue;
+
+    // bez = the full trainings string (used for academy mapping)
+    results.push({name, date, bez:trainings, email, emp:emp||nameKunde,
+                  excluded:cancelled, checked:!cancelled&&!isTDJ});
+  }
+  return{rows:results, hotel:hotelName, date:firstDate,
+         treatments:detectedTreatments, isInhouse};
+}
+
+/* ── Import ── */
+function doImport(){
+  const rawP=document.getElementById('participants-paste').value.trim();
+  if(!rawP){alert('Bitte den Teilnehmer-Export einfügen.');return;}
+  const parsed=parseParticipants(rawP);
+  rows=parsed.rows;
+  if(!rows.length){alert('Keine Teilnehmer erkannt. Bitte Export-Format prüfen.');return;}
+
+  document.getElementById('participants-paste').classList.add('done');
+  detectedDate=parsed.date;
+  parsedHotel=parsed.hotel;
+  document.getElementById('date-input').value=fmtDate(detectedDate);
+
+  // Auto-set treatments from pipe-separated Trainings column (In-House)
+  if(parsed.isInhouse&&parsed.treatments.length){
+    treatments=parsed.treatments;
+  }
+
+  // Reset and auto-detect diploma
+  selectedDiploma='';
+  detectedDiploma='';
+
+  if(parsed.isInhouse){
+    // In-House: always use "In-House Training" as default
+    detectedDiploma='In-House Training';
+  } else {
+    // Academy: look up diploma from the Trainings value
+    for(const r of rows){
+      const match=mapping[r.bez.trim().toLowerCase()];
+      if(match&&match.diploma){detectedDiploma=match.diploma;break;}
+    }
+  }
+  document.getElementById('diploma-select').value=detectedDiploma||'';
+
+  document.getElementById('config-card').classList.remove('hidden');
+  document.getElementById('participants-card').classList.remove('hidden');
+
+  renderDynamicConfig();
+  prefillHotel();
+  updateSummary();
+  renderTable();
+}
+
+/* ── Diploma change ── */
+function onDiplomaChange(){
+  selectedDiploma=document.getElementById('diploma-select').value;
+  renderDynamicConfig();
+  updateSummary();
+  updateGenBtn();
+}
+
+function getActiveDiploma(){return selectedDiploma||detectedDiploma;}
+function getActiveDate(){return document.getElementById('date-input')?.value||fmtDate(detectedDate);}
+
+/* ── Dynamic config fields based on selected diploma ── */
+function renderDynamicConfig(){
+  const diploma=getActiveDiploma();
+  const tplInfo=TEMPLATE_FIELDS[diploma]||{treats:0,hotel:false,location:false};
+  const isInhouse=diploma&&INHOUSE_DIPLOMAS.has(diploma);
+  const el=document.getElementById('dynamic-config');
+
+  if(!isInhouse||!diploma){el.innerHTML='';return;}
+
+  // Preserve existing values before re-render
+  const prev={
+    hotel1:(document.getElementById('hotel1-input')?.value||''),
+    hotel2:(document.getElementById('hotel2-input')?.value||''),
+    location:(document.getElementById('location-input')?.value||''),
+  };
+
+  let html='';
+
+  if(tplInfo.hotel){
+    html+=
+      '<div class="config-row" style="border-top:none;gap:12px">'+
+        '<div class="config-field grow">'+
+          '<div class="opt-lbl">Hotelname Zeile 1</div>'+
+          '<input type="text" id="hotel1-input" placeholder="z.B. Hotel Adler" style="width:100%" value="'+esc(prev.hotel1)+'" oninput="updateSummary()"/>'+
+        '</div>'+
+        '<div class="config-field grow">'+
+          '<div class="opt-lbl">Hotelname Zeile 2 (optional)</div>'+
+          '<input type="text" id="hotel2-input" placeholder="z.B. Dolomiti Spa Resort" style="width:100%" value="'+esc(prev.hotel2)+'"/>'+
+        '</div>'+
+      '</div>';
+  }
+
+  if(tplInfo.location){
+    html+=
+      '<div class="config-row" style="border-top:none">'+
+        '<div class="config-field grow">'+
+          '<div class="opt-lbl">Location</div>'+
+          '<input type="text" id="location-input" placeholder="z.B. Hotel Adler, Bozen" style="width:100%" value="'+esc(prev.location)+'" oninput="updateSummary()"/>'+
+        '</div>'+
+      '</div>';
+  }
+
+  if(tplInfo.treats>0){
+    html+=
+      '<div class="config-row" style="border-top:none"><div class="config-field grow">'+
+        '<div class="opt-lbl">Treatments (max '+tplInfo.treats+' Zeilen)</div>'+
+        '<div id="treatments-display"><div class="empty">Noch keine Treatments importiert</div></div>'+
+        '<div class="add-treatment-row">'+
+          '<input type="text" id="add-treatment-input" placeholder="Treatment hinzufügen…" onkeydown="if(event.key===\'Enter\')addTreatment()">'+
+          '<button class="btn btn-sm" onclick="addTreatment()">+ Hinzufügen</button>'+
+        '</div>'+
+      '</div></div>';
+  }
+
+  el.innerHTML=html;
+  prefillHotel();
+  renderTreatments();
+}
+
+/* Pre-fill hotel fields from parsedHotel state (only if empty) */
+function prefillHotel(){
+  if(!parsedHotel)return;
+  const h1=document.getElementById('hotel1-input');
+  const loc=document.getElementById('location-input');
+  if(h1&&!h1.value)h1.value=parsedHotel;
+  if(loc&&!loc.value)loc.value=parsedHotel;
+}
+
+/* ── Summary banner ── */
+function updateSummary(){
+  const d=getActiveDiploma();
+  const paper=d?(DIPLOMA_PAPER[d]||''):'';
+  const isInhouse=d&&INHOUSE_DIPLOMAS.has(d);
+  const hotel=(document.getElementById('hotel1-input')?.value||document.getElementById('location-input')?.value||'').trim();
+
+  const elD=document.getElementById('sum-diploma');
+  elD.textContent=d||'⚠ Bitte Vorlage wählen';
+  elD.classList.toggle('warn',!d);
+
+  if(paper){
+    const cls=paper.toLowerCase()==='kornblume'?'paper-kornblume':'paper-wassernabel';
+    document.getElementById('sum-paper').innerHTML='<span class="'+cls+'">'+esc(paper)+'</span>';
+  }else{
+    document.getElementById('sum-paper').textContent='—';
+  }
+
+  document.getElementById('sum-hotel-wrap').classList.toggle('hidden',!isInhouse);
+  document.getElementById('sum-hotel').textContent=hotel||'—';
+}
+
+/* ── Treatments management ── */
+function renderTreatments(){
+  const el=document.getElementById('treatments-display');
+  if(!el)return;
+  if(!treatments.length){el.innerHTML='<div class="empty">Noch keine Treatments importiert</div>';return;}
+  el.innerHTML='<ul class="treatment-list">'+treatments.map((t,i)=>
+    '<li class="treatment-item">'+
+      '<input class="treatment-edit" value="'+esc(t)+'" onchange="treatments['+i+']=this.value" style="width:'+Math.max(100,t.length*7)+'px">'+
+      '<span class="treatment-remove" onclick="removeTreatment('+i+')">×</span>'+
+    '</li>'
+  ).join('')+'</ul>';
+}
+function removeTreatment(idx){treatments.splice(idx,1);renderTreatments();}
+function addTreatment(){
+  const inp=document.getElementById('add-treatment-input');
+  const val=inp.value.trim();if(!val)return;
+  treatments.push(val);inp.value='';renderTreatments();
+}
+
+/* ── Participants table ── */
+function renderTable(){
+  const tbody=document.getElementById('tbl-body');
+  tbody.innerHTML='';
+  document.getElementById('s-total').textContent=rows.length;
+  document.getElementById('s-excl').textContent=rows.filter(r=>r.excluded).length;
+  document.getElementById('s-sel').textContent=rows.filter(r=>r.checked).length;
+  updateGenBtn();
+
+  rows.forEach((r,idx)=>{
+    const isTDJ=r.email&&r.email.toLowerCase().endsWith('@teamdrjoseph.com');
+    const tr=document.createElement('tr');
+    if(r.excluded)tr.classList.add('excl');
+    const tags=
+      (r.excluded?'<span class="badge b-excl">Abgemeldet</span>':'')+
+      (isTDJ?'<span class="badge b-tdj">TEAM DR JOSEPH</span>':'');
+    tr.innerHTML=
+      '<td><input type="checkbox" '+(r.checked?'checked':'')+' onchange="rows['+idx+'].checked=this.checked;onCheckChange()"></td>'+
+      '<td><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.82rem">'+esc(r.name)+
+        (tags?'<span style="display:flex;gap:4px">'+tags+'</span>':'')+'</div></td>'+
+      '<td style="font-size:.72rem;color:var(--light)">'+esc(r.email||'—')+'</td>'+
+      '<td style="font-size:.72rem;color:var(--light);white-space:nowrap">'+esc(fmtDate(r.date))+'</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function onCheckChange(){
+  document.getElementById('s-sel').textContent=rows.filter(r=>r.checked).length;
+  updateGenBtn();
+}
+function updateGenBtn(){
+  const disabled=rows.filter(r=>r.checked).length===0||!getActiveDiploma();
+  document.getElementById('gen-btn-single').disabled=disabled;
+  document.getElementById('gen-btn-zip').disabled=disabled;
+}
+function selectAll(v){rows.forEach(r=>r.checked=v);renderTable();}
+function toggleAll(cb){rows.forEach(r=>r.checked=cb.checked);renderTable();}
+
+/* ── PDF loading (cached) ── */
+async function loadPdf(name,herb){
+  const key=name+(herb?'|herb':'');
+  if(pdfCache[key])return pdfCache[key];
+  try{
+    const res=await fetch('templates/TEAM DR JOSEPH Diploma '+name+(herb?' - Herbarium':'')+'.pdf');
+    if(!res.ok)return null;
+    pdfCache[key]=new Uint8Array(await res.arrayBuffer());
+    return pdfCache[key];
+  }catch(e){return null;}
+}
+
+/* ── Distribute treatments in diamond layout ──
+   - Sort treatments by length (shortest → longest)
+   - If count ≤ n_slots: every treatment gets its own line (singles)
+   - If count > n_slots: pair the SHORTEST items together (2 per line),
+     keep the LONGEST as singles. Need exactly (count - n_slots) pairs.
+   - Arrange in diamond shape: longest in center, shortest at edges (top+bottom).
+     Empty slots distributed symmetrically around the diamond.
+
+   Result: longest treatments visually centered, line lengths decreasing
+   outward — looks balanced regardless of input count. */
+function distributeTreatments(list,n){
+  const slots=Array(n).fill('');
+  if(!list.length||n<=0)return slots;
+
+  // Sort by length, shortest first
+  const sorted=[...list].sort((a,b)=>a.length-b.length);
+
+  // Build items: each entry is one line's content (single or paired)
+  let items;
+  if(sorted.length<=n){
+    items=sorted; // every treatment on its own line
+  } else {
+    // Need (sorted.length - n) pairs to fit; pair shortest items, single the longest
+    const numPairs=sorted.length-n;
+    const toPair=sorted.slice(0,numPairs*2);   // shortest 2*numPairs items
+    const singles=sorted.slice(numPairs*2);    // longer items remain as singles
+    const pairs=[];
+    for(let i=0;i<numPairs;i++) pairs.push(toPair[2*i]+' / '+toPair[2*i+1]);
+    // Re-sort pairs by combined length so they fit diamond logic
+    pairs.sort((a,b)=>a.length-b.length);
+    items=[...pairs,...singles]; // shortest-content first, longest-content last
+  }
+
+  // Compute center-out slot indices
+  // n=8: midpoints are 3,4 → centerOut=[4,3,5,2,6,1,7,0]
+  // n=5: midpoint is 2 → centerOut=[2,3,1,4,0]
+  const centerOut=[];
+  if(n%2===0){
+    const upMid=n/2-1, downMid=n/2;
+    centerOut.push(downMid,upMid);
+    let up=upMid-1,down=downMid+1;
+    while(up>=0||down<n){
+      if(down<n)centerOut.push(down++);
+      if(up>=0)centerOut.push(up--);
+    }
+  } else {
+    const mid=Math.floor(n/2);
+    centerOut.push(mid);
+    let up=mid-1,down=mid+1;
+    while(up>=0||down<n){
+      if(down<n)centerOut.push(down++);
+      if(up>=0)centerOut.push(up--);
+    }
+  }
+
+  // Place longest item first into center slot, work outward
+  const placeOrder=items.slice().reverse(); // longest first
+  for(let i=0;i<placeOrder.length&&i<n;i++){
+    slots[centerOut[i]]=placeOrder[i];
+  }
+  return slots;
+}
+
+/* Decode a PDFString or PDFHexString to a plain JS string (handles UTF-16 BE) */
+function decodePdfStr(s){
+  if(!s) return '';
+  if(typeof s.decodeText==='function') return s.decodeText();
+  if(typeof s.asString==='function') return s.asString();
+  return String(s);
+}
+
+/* ── RAW-DICT FONT-FIX (MonumentGrotesk-SemiMono preserved) ──
+   Set /V via PDFString, delete /AP, set /Q=1 (centered), NeedAppearances=true.
+   Save with updateFieldAppearances:false → reader regenerates AP using /DA font
+   (MonumentGrotesk) with centered alignment. Fields stay editable.
+   For merge: same approach — NeedAppearances survives copyPages. */
+async function fillPdfRawDict(bytes, fieldValues, shouldFlatten){
+  const{PDFDocument,PDFName,PDFString,PDFBool,PDFNumber}=PDFLib;
+  const doc=await PDFDocument.load(bytes,{updateMetadata:false});
+  const acroForm=doc.catalog.lookup(PDFName.of('AcroForm'));
+  const fields=acroForm.lookup(PDFName.of('Fields'));
+
+  for(let i=0;i<fields.size();i++){
+    const field=fields.lookup(i);
+    const rawName=field.get(PDFName.of('T'));
+    if(!rawName)continue;
+    const name=decodePdfStr(rawName);
+    if(!(name in fieldValues))continue;
+    field.set(PDFName.of('V'),PDFString.of(fieldValues[name]));
+    field.delete(PDFName.of('AP'));
+    field.set(PDFName.of('Q'),PDFNumber.of(1)); // 0=left, 1=center, 2=right
+  }
+
+  acroForm.set(PDFName.of('NeedAppearances'),PDFBool.True);
+
+  if(shouldFlatten){
+    const tmp=await doc.save({updateFieldAppearances:false});
+    const doc2=await PDFDocument.load(tmp);
+    try{doc2.getForm().flatten();}catch(e){}
+    return await doc2.save();
+  }
+
+  return await doc.save({updateFieldAppearances:false});
+}
+
+/* ── MERGE PDFs preserving form fields & font ──
+   Problem: PDFDocument.create() + copyPages drops the source AcroForm,
+   so /DA (font ref to MonumentGrotesk) and /DR (font resources) are lost.
+   Reader falls back to Helvetica and widgets become non-editable.
+
+   Solution: load first filled PDF as base. It already has correct AcroForm,
+   filled values, /Q=1 centering, and NeedAppearances=true. For each
+   subsequent PDF:
+   1) copyPages — brings page content + widget annotations along
+   2) Walk source AcroForm.Fields and append each Field reference to
+      base AcroForm.Fields (with a _pN suffix to avoid name collision).
+   This correctly handles BOTH layouts:
+   - Merged field+widget (single dict, T/V/Subtype=Widget all on the same
+     node) — typical Acrobat-exported forms
+   - Compound fields (Parent has T/V, Kids array contains Widget annots) —
+     some InDesign exports use this. The Parent Field is what holds the
+     value; its Kids are picked up from the copied page annotations and
+     stay correctly linked because they reference the Parent via /Parent.
+*/
+async function mergePdfs(pdfBytesArr, shouldFlatten){
+  const{PDFDocument,PDFName,PDFBool,PDFString}=PDFLib;
+  if(pdfBytesArr.length===1){
+    if(!shouldFlatten) return pdfBytesArr[0];
+    const d=await PDFDocument.load(pdfBytesArr[0]);
+    try{d.getForm().flatten();}catch(e){}
+    return await d.save();
+  }
+
+  // Load first PDF as base — keeps its AcroForm with /DA, /DR, NeedAppearances
+  const base=await PDFDocument.load(pdfBytesArr[0]);
+  const baseAcro=base.catalog.lookup(PDFName.of('AcroForm'));
+  const baseFields=baseAcro.lookup(PDFName.of('Fields'));
+
+  // Suffix base fields so they're unique (page 1 → _p1)
+  for(let i=0;i<baseFields.size();i++){
+    const f=baseFields.lookup(i);
+    const tRaw=f.get(PDFName.of('T'));
+    if(tRaw){
+      const orig=decodePdfStr(tRaw);
+      f.set(PDFName.of('T'),PDFString.of(orig+'_p1'));
+    }
+  }
+
+  // Append pages 2..N from other PDFs
+  for(let p=1;p<pdfBytesArr.length;p++){
+    const src=await PDFDocument.load(pdfBytesArr[p]);
+
+    // copyPages must run BEFORE we read src AcroForm refs, because copyPages
+    // is what actually clones objects into the base context.
+    const copied=await base.copyPages(src,src.getPageIndices());
+    copied.forEach(pg=>base.addPage(pg));
+
+    // Now register source fields in base AcroForm. We walk the copied pages'
+    // Annots (which were cloned with the pages into base context) and find
+    // Widget annotations. For each widget, we determine the canonical Field:
+    //   - If the widget itself has /T → it IS the field (merged form)
+    //   - Else if widget has /Parent → walk up to the field node
+    // We dedupe by field reference, then push each field into baseFields and
+    // rename it with a _pN suffix to avoid collisions.
+    const seenFieldRefs=new Set();
+    const fieldsToRegister=[]; // { ref, name }
+
+    copied.forEach(pg=>{
+      const annots=pg.node.lookup(PDFName.of('Annots'));
+      if(!annots||typeof annots.size!=='function')return;
+      for(let a=0;a<annots.size();a++){
+        const annot=annots.lookup(a);
+        if(!annot||typeof annot.get!=='function')continue;
+        const subtype=annot.get(PDFName.of('Subtype'));
+        if(!subtype||subtype.toString()!=='/Widget')continue;
+
+        // Walk up to find the field that owns this widget
+        let fieldDict=annot;
+        let fieldRef=annots.get(a); // initial: ref to the widget itself
+        if(!fieldDict.get(PDFName.of('T'))){
+          // Compound field: widget has no /T, follow /Parent up
+          let parentRef=fieldDict.get(PDFName.of('Parent'));
+          while(parentRef){
+            const parent=base.context.lookup(parentRef);
+            if(!parent||typeof parent.get!=='function')break;
+            fieldRef=parentRef;
+            fieldDict=parent;
+            if(parent.get(PDFName.of('T')))break;
+            parentRef=parent.get(PDFName.of('Parent'));
+          }
+        }
+
+        // Skip if we've already registered this field (multiple widgets
+        // can belong to the same field)
+        const refKey=fieldRef.toString();
+        if(seenFieldRefs.has(refKey))continue;
+        seenFieldRefs.add(refKey);
+
+        // Rename the field with _pN suffix
+        const tRaw=fieldDict.get(PDFName.of('T'));
+        if(tRaw){
+          const orig=decodePdfStr(tRaw);
+          fieldDict.set(PDFName.of('T'),PDFString.of(orig+'_p'+(p+1)));
+        }
+        fieldsToRegister.push(fieldRef);
+      }
+    });
+
+    // Register all collected field refs in base AcroForm.Fields
+    fieldsToRegister.forEach(ref=>baseFields.push(ref));
+  }
+
+  // Ensure NeedAppearances stays true so reader regenerates AP with correct font
+  baseAcro.set(PDFName.of('NeedAppearances'),PDFBool.True);
+
+  if(shouldFlatten){
+    const tmp=await base.save({updateFieldAppearances:false});
+    const d2=await PDFDocument.load(tmp);
+    try{d2.getForm().flatten();}catch(e){}
+    return await d2.save();
+  }
+  return await base.save({updateFieldAppearances:false});
+}
+
+/* ── Build field values for a diploma ── */
+function buildFieldValues(name, dateStr, diploma, hotelZ1, hotelZ2, location, treatmentList){
+  const tplInfo=TEMPLATE_FIELDS[diploma]||{treats:0,hotel:false,location:false};
+  const isInhouse=INHOUSE_DIPLOMAS.has(diploma);
+  const fv={};
+  fv['FIRST + LAST NAME']=name.toUpperCase();
+  fv['DATE']='DATE: '+dateStr;
+  if(isInhouse){
+    if(tplInfo.hotel){
+      fv['HOTEL NAME Z1']=hotelZ1.toUpperCase();
+      fv['HOTEL NAME Z2']=hotelZ2.toUpperCase();
+    }
+    if(tplInfo.location) fv['LOCATION']=location.toUpperCase();
+    const tLines=distributeTreatments(treatmentList,tplInfo.treats||4);
+    for(let t=0;t<(tplInfo.treats||4);t++) fv['TREATMENT Z'+(t+1)]=tLines[t];
+  }
+  return fv;
+}
+
+/* ── Batch generate ── */
+async function generate(exportMode){
+  const diploma=getActiveDiploma();
+  if(!diploma){alert('Bitte eine Diplom-Vorlage auswählen.');return;}
+  const toGen=rows.filter(r=>r.checked);
+  if(!toGen.length){alert('Keine Teilnehmer ausgewählt.');return;}
+
+  const btnS=document.getElementById('gen-btn-single');
+  const btnZ=document.getElementById('gen-btn-zip');
+  const prog=document.getElementById('prog');
+  const fill=document.getElementById('prog-fill');
+  const log=document.getElementById('prog-log');
+  const lbl=document.getElementById('prog-lbl');
+  btnS.disabled=true;btnZ.disabled=true;
+  prog.style.display='block';log.textContent='';fill.style.width='0%';
+  lbl.textContent='Generiere '+toGen.length+' Diplome…';
+
+  const wantHerb=mode==='digital';
+  let bytes=await loadPdf(diploma,wantHerb);
+  if(!bytes&&wantHerb) bytes=await loadPdf(diploma,false);
+  if(!bytes&&!wantHerb) bytes=await loadPdf(diploma,true);
+  if(!bytes){
+    lbl.textContent='✗ PDF-Vorlage nicht gefunden: „'+diploma+'"';
+    btnS.disabled=false;btnZ.disabled=false;return;
+  }
+
+  const dateStr=getActiveDate();
+  const hotelZ1=(document.getElementById('hotel1-input')?.value||'').trim();
+  const hotelZ2=(document.getElementById('hotel2-input')?.value||'').trim();
+  const location=(document.getElementById('location-input')?.value||'').trim();
+
+  const pdfs=[];
+  let ok=0,fail=0;
+
+  for(let i=0;i<toGen.length;i++){
+    const p=toGen[i];
+    try{
+      const fv=buildFieldValues(p.name,dateStr,diploma,hotelZ1,hotelZ2,location,treatments);
+      const out=await fillPdfRawDict(bytes,fv,locked);
+      const safe=p.name.replace(/[^a-zA-Z0-9 äöüÄÖÜß\-]/g,'').trim().replace(/ /g,'_');
+      pdfs.push({name:safe,bytes:out});
+      log.textContent+='✓  '+p.name+'\n';ok++;
+    }catch(e){
+      log.textContent+='✗  '+p.name+' – '+e.message+'\n';fail++;
+    }
+    fill.style.width=Math.round((i+1)/toGen.length*100)+'%';
+    log.scrollTop=log.scrollHeight;
+    await new Promise(r=>setTimeout(r,8));
+  }
+
+  const baseName='TDJ_'+diploma.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_')+'_'+new Date().toISOString().slice(0,10);
+  lbl.textContent='Datei wird erstellt…';
+
+  if(exportMode==='zip'){
+    // One PDF per person in a ZIP
+    const zip=new JSZip();
+    pdfs.forEach(p=>zip.file(p.name+'.pdf',p.bytes));
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=baseName+'.zip';
+    a.click();URL.revokeObjectURL(a.href);
+  } else {
+    // Single merged file: use FIRST filled PDF as base (preserves AcroForm with
+    // /DA font reference + /DR resources for MonumentGrotesk-SemiMono).
+    // Then copy remaining pages AND register their widget annotations into
+    // the base AcroForm.Fields array — otherwise fields appear non-editable
+    // and fonts fall back to Helvetica because /DA isn't carried per-widget.
+    const mergedBytes=await mergePdfs(pdfs.map(p=>p.bytes),locked);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([mergedBytes],{type:'application/pdf'}));
+    a.download=baseName+'.pdf';
+    a.click();URL.revokeObjectURL(a.href);
+  }
+
+  lbl.textContent='✓ '+ok+' Diplom'+(ok!==1?'e':'')+' erstellt'+(fail?' · '+fail+' Fehler':'');
+  btnS.disabled=false;btnZ.disabled=false;
+}
+
+/* ── Quick Generate ── */
+let qMode='print', qLocked=false;
+
+function openQuick(){
+  const today=new Date();
+  const todayFmt=String(today.getDate()).padStart(2,'0')+'/'+String(today.getMonth()+1).padStart(2,'0')+'/'+today.getFullYear();
+  const diplomaOptions=ALL_DIPLOMAS.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
+
+  document.getElementById('quick-modal-body').innerHTML=
+    '<div class="modal-row"><label>Diplom-Vorlage</label>'+
+    '<select id="q-diploma" onchange="qUpdateFields()"><option value="">— bitte wählen —</option>'+diplomaOptions+'</select></div>'+
+    '<div id="q-dynamic-fields"></div>'+
+    '<div class="modal-row"><label>Vorlage</label>'+
+    '<div class="tog-row">'+
+      '<button class="tog on" id="q-tog-print" onclick="qSetMode(\'print\')">Ohne Herbarium</button>'+
+      '<button class="tog" id="q-tog-herb" onclick="qSetMode(\'digital\')">Mit Herbarium</button>'+
+    '</div></div>'+
+    '<div class="modal-row"><label>Formularfelder</label>'+
+    '<div class="tog-row">'+
+      '<button class="tog" id="q-tog-locked" onclick="qSetLock(true)">Gesperrt</button>'+
+      '<button class="tog on" id="q-tog-edit" onclick="qSetLock(false)">Editierbar</button>'+
+    '</div></div>'+
+    '<div id="q-status" style="font-size:10px;color:var(--sage);font-weight:700;min-height:16px;letter-spacing:.04em"></div>';
+
+  qMode='print'; qLocked=false;
+  const cur=getActiveDiploma();
+  if(cur)document.getElementById('q-diploma').value=cur;
+  qUpdateFields(todayFmt);
+
+  document.getElementById('quick-modal').classList.remove('hidden');
+}
+
+function qUpdateFields(defaultDate){
+  const diploma=(document.getElementById('q-diploma')?.value||'');
+  const tplInfo=TEMPLATE_FIELDS[diploma]||{treats:0,hotel:false,location:false};
+  const isInhouse=diploma&&INHOUSE_DIPLOMAS.has(diploma);
+  const today=new Date();
+  const fallback=String(today.getDate()).padStart(2,'0')+'/'+String(today.getMonth()+1).padStart(2,'0')+'/'+today.getFullYear();
+  const useDate=defaultDate||document.getElementById('q-date')?.value||fallback;
+
+  let html=
+    '<div class="modal-row"><label>Name</label><input type="text" id="q-name" placeholder="Vorname Nachname"></div>'+
+    '<div class="modal-row"><label>Datum</label><input type="text" id="q-date" value="'+useDate+'" placeholder="TT/MM/JJJJ"></div>';
+
+  if(isInhouse){
+    if(tplInfo.hotel){
+      html+=
+        '<div class="modal-row"><label>Hotelname Zeile 1</label><input type="text" id="q-hotel1" placeholder="z.B. Hotel Adler"></div>'+
+        '<div class="modal-row"><label>Hotelname Zeile 2 (optional)</label><input type="text" id="q-hotel2" placeholder="z.B. Dolomiti Spa Resort"></div>';
+    }
+    if(tplInfo.location){
+      html+='<div class="modal-row"><label>Location</label><input type="text" id="q-location" placeholder="z.B. Hotel Adler, Bozen"></div>';
+    }
+    if(tplInfo.treats>0){
+      html+='<div class="modal-row"><label>Treatments (eine pro Zeile, max '+tplInfo.treats+')</label>'+
+        '<textarea id="q-treats" rows="'+Math.min(tplInfo.treats,5)+'" placeholder="Signature Face Treatment&#10;Supreme Eye Lift&#10;…"></textarea></div>';
+    }
+  }
+  document.getElementById('q-dynamic-fields').innerHTML=html;
+  setTimeout(()=>document.getElementById('q-name')?.focus(),20);
+}
+
+function closeQuick(){
+  document.getElementById('quick-modal').classList.add('hidden');
+  document.getElementById('quick-modal-body').innerHTML='';
+}
+
+function qSetMode(m){qMode=m;document.getElementById('q-tog-print').classList.toggle('on',m==='print');document.getElementById('q-tog-herb').classList.toggle('on',m==='digital');}
+function qSetLock(l){qLocked=l;document.getElementById('q-tog-locked').classList.toggle('on',l);document.getElementById('q-tog-edit').classList.toggle('on',!l);}
+
+async function quickGenerate(){
+  const name   =(document.getElementById('q-name')?.value||'').trim();
+  const date   =(document.getElementById('q-date')?.value||'').trim();
+  const diploma=(document.getElementById('q-diploma')?.value||'').trim();
+  if(!name)  {alert('Bitte einen Namen eingeben.');document.getElementById('q-name')?.focus();return;}
+  if(!diploma){alert('Bitte eine Diplom-Vorlage wählen.');return;}
+
+  const hotel1  =(document.getElementById('q-hotel1')?.value||'').trim();
+  const hotel2  =(document.getElementById('q-hotel2')?.value||'').trim();
+  const location=(document.getElementById('q-location')?.value||'').trim();
+  const treatList=(document.getElementById('q-treats')?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+
+  const wantHerb=qMode==='digital';
+  let bytes=await loadPdf(diploma,wantHerb);
+  if(!bytes&&wantHerb) bytes=await loadPdf(diploma,false);
+  if(!bytes&&!wantHerb) bytes=await loadPdf(diploma,true);
+  if(!bytes){alert('PDF-Vorlage nicht gefunden: „'+diploma+'"');return;}
+
+  try{
+    const fv=buildFieldValues(name,date,diploma,hotel1,hotel2,location,treatList);
+    const out=await fillPdfRawDict(bytes,fv,qLocked);
+    const safe=name.replace(/[^a-zA-Z0-9 äöüÄÖÜß\-]/g,'').trim().replace(/ /g,'_');
+    const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+    const a=document.createElement('a');a.href=url;a.download=safe+'.pdf';a.click();URL.revokeObjectURL(url);
+    // Keep modal open — clear only name, show confirmation
+    const status=document.getElementById('q-status');
+    if(status){status.textContent='✓ '+name+' — heruntergeladen';setTimeout(()=>{if(status)status.textContent='';},3000);}
+    const nameEl=document.getElementById('q-name');
+    if(nameEl){nameEl.value='';nameEl.focus();}
+  }catch(e){alert('Fehler: '+e.message);}
+}
+
+/* ── Helpers ── */
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(d){if(!d)return'';const m=d.match(/^(\d{2})\.(\d{2})\.(\d{4})/);return m?m[1]+'/'+m[2]+'/'+m[3]:d;}
+
+init();
+</script>
+</body>
+</html>
