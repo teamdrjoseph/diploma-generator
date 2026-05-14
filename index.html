@@ -79,6 +79,42 @@
   .modal-row input,.modal-row select,.modal-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:1px;font-family:inherit;font-size:11px;background:var(--warm);color:var(--text);outline:none}
   .modal-row input:focus,.modal-row select:focus,.modal-row textarea:focus{border-color:var(--text)}
   .modal-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+  .modal-wide{width:680px;max-width:96vw}
+
+  /* Buttons — ghost variant */
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-ghost:hover{background:var(--bg)}
+
+  /* Autocomplete dropdown — uses position:fixed to escape any parent overflow:hidden */
+  .ac-dropdown{position:fixed;max-height:280px;overflow-y:auto;background:var(--warm);border:1px solid var(--border);border-radius:1px;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+  .ac-cat-header{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--light);padding:8px 12px 4px;background:var(--bg);position:sticky;top:0}
+  .ac-item{padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text);border-top:1px solid transparent}
+  .ac-item:hover,.ac-item.ac-highlighted{background:var(--bg);color:var(--text)}
+  .ac-item-cat{font-weight:600}
+  .ac-empty{padding:12px;font-size:10px;color:var(--light);font-style:italic;text-align:center}
+
+  /* Trainings Manager */
+  .tm-cat{border:1px solid var(--border);border-radius:1px;margin-bottom:12px;background:var(--warm)}
+  .tm-cat-header{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-bottom:1px solid var(--border)}
+  .tm-cat-name{flex:1;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid transparent;background:transparent;padding:4px 6px;font-family:inherit;color:var(--text);outline:none}
+  .tm-cat-name:focus,.tm-cat-name:hover{border-color:var(--border);background:var(--warm)}
+  .tm-toggle{font-size:10px;color:var(--light);display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
+  .tm-toggle input{cursor:pointer}
+  .tm-items{list-style:none;padding:6px 10px;margin:0;display:flex;flex-direction:column;gap:4px}
+  .tm-items li{display:flex;align-items:center;gap:6px}
+  .tm-items li input{flex:1;padding:5px 8px;font-size:11px;border:1px solid var(--border);background:var(--warm);font-family:inherit;color:var(--text);outline:none;border-radius:1px}
+  .tm-items li input:focus{border-color:var(--text)}
+  .tm-remove{cursor:pointer;width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:var(--light);font-size:14px;line-height:1;border:none;background:transparent;border-radius:1px}
+  .tm-remove:hover{color:var(--red);background:var(--bg)}
+  .tm-empty{padding:10px;font-size:10px;color:var(--light);font-style:italic;text-align:center}
+  .tm-add-row{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);background:var(--bg)}
+  .tm-add-row input{flex:1;padding:5px 8px;font-size:11px;border:1px solid var(--border);background:var(--warm);font-family:inherit;outline:none;border-radius:1px}
+  .tm-add-cat{display:flex;gap:6px;margin-top:14px;padding-top:14px;border-top:2px dashed var(--border)}
+  .tm-add-cat input{flex:1;padding:7px 10px;font-size:11px;border:1px solid var(--border);background:var(--warm);font-family:inherit;outline:none;border-radius:1px}
+
+  /* Quick-Generate treatment chips display */
+  .q-treatments-display{min-height:28px;padding:6px;border:1px solid var(--border);border-radius:1px;background:var(--bg);margin-bottom:6px}
+  .q-treatments-display .empty{font-size:10px;color:var(--light);font-style:italic;padding:4px}
 </style>
 </head>
 <body>
@@ -104,6 +140,21 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeQuick()">Schließen</button>
       <button class="btn btn-p" onclick="quickGenerate()">Diplom generieren ↓</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRAININGS MANAGER MODAL -->
+<div class="modal-overlay hidden" id="trainings-modal" onclick="if(event.target===this)closeTrainingsManager()">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <div class="modal-title">Trainings verwalten</div>
+      <button class="modal-close" onclick="closeTrainingsManager()">×</button>
+    </div>
+    <div class="modal-body" id="trainings-manager-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="resetTrainingsToDefaults()">Auf Werkseinstellungen zurücksetzen</button>
+      <button class="btn btn-p" onclick="closeTrainingsManager()">Fertig</button>
     </div>
   </div>
 </div>
@@ -258,23 +309,151 @@ const INHOUSE_DIPLOMAS=new Set(["In-House Training","Individual Training","Indiv
 
 const DIPLOMA_PAPER={"Complete Body Treatment Training":"Wassernabel","Complete Body Treatment Training Theory":"Wassernabel","Deep Dive":"Kornblume","Empowering Receptionists":"Wassernabel","From Knowledge To Brand Impact":"Wassernabel","Holistic Face Body Ritual":"Kornblume","In-House Training":"Wassernabel","Individual Training":"Kornblume","Individual Training Body":"Wassernabel","Individual Training Face":"Wassernabel","Introduction Training":"Kornblume","Private Training":"Wassernabel","Signature Treatment Training":"Kornblume","Signature Treatment Training Theory":"Kornblume","Supreme Eye Face Lift Treatment":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory":"Kornblume"};
 
-/* Field structure per inhouse template (scanned from actual PDFs) */
+/* Field structure per inhouse template.
+   - treats: max slots (LARGE version = always 8)
+   - smallSlots: slots in the small version (4 or 5)
+   - smallExists: whether a small version exists at all
+   The big version always exists. Small version is preferred when treatments
+   fit; falls back to large otherwise. Both Normal and Herbarium are tried
+   per variant. */
 const TEMPLATE_FIELDS={
-  "In-House Training":       {treats:8, hotel:true,  location:false},
-  "Individual Training":     {treats:8, hotel:true,  location:false},
-  "Individual Training Body":{treats:8, hotel:true,  location:false},
-  "Individual Training Face":{treats:8, hotel:true,  location:false},
-  "Introduction Training":   {treats:8, hotel:false, location:true},
-  "Private Training":        {treats:8, hotel:true,  location:false}
+  "In-House Training":       {treats:8, smallSlots:5, smallExists:true,  hotel:true,  location:false},
+  "Individual Training":     {treats:8, smallSlots:4, smallExists:true,  hotel:true,  location:false},
+  "Individual Training Body":{treats:8, smallSlots:4, smallExists:true,  hotel:true,  location:false},
+  "Individual Training Face":{treats:8, smallSlots:4, smallExists:false, hotel:true,  location:false},
+  "Introduction Training":   {treats:8, smallSlots:4, smallExists:true,  hotel:false, location:true},
+  "Private Training":        {treats:8, smallSlots:5, smallExists:true,  hotel:true,  location:false}
 };
 
-/* ── State ── */
+/* Trainings list used for treatment autocomplete.
+   Grouped by category; each category may also be selectable on its own
+   if `selectable:true`. Persisted to localStorage so changes survive refresh.
+   Source: ERP categories 01-10. */
+const TRAININGS_DEFAULTS=[
+  {cat:"FACE", selectable:false, items:[
+    "INFO DAY TEAM DR JOSEPH & THE PERFECT DEVICE",
+    "SIGNATURE TREATMENT TRAININGS FACE",
+    "ADVANCED TRAINING COSMETIC KNOW-HOW",
+    "THE PERFECT DEVICE",
+    "SUPREME EYE + FACE LIFT TREATMENT",
+    "HOLISTIC FACE + BODY RITUAL",
+    "REJUVENATING FACE TREATMENT",
+    "SIGNATURE TREATMENT TRAININGS FACE (REFRESH)",
+    "THE PERFECT DEVICE (REFRESH)",
+    "SUPREME EYE + FACE LIFT TREATMENT (REFRESH)",
+    "HOLISTIC FACE + BODY RITUAL (REFRESH)",
+    "SIGNATURE TREATMENT TRAINING (REFRESH)",
+    "REJUVENATING FACE TREATMENT (REFRESH)",
+    "DEEP DIVE: LONGEVITY, SKIN HEALTH + TECHNIQUES",
+    "BLOSSOM ESSENCE FACE TREATMENT",
+    "MOMENTS OF HARMONY FOR MOTHERHOOD",
+    "HYDRATING TRANQUILITY RITUAL",
+    "ULTRASONIC REVIVE RITUAL"
+  ]},
+  {cat:"BODY", selectable:false, items:[
+    "BOTANICAL SPA HIGHLIGHTS",
+    "ACTIVE - METHODS",
+    "DETOX - METHODS",
+    "RELAX - METHODS",
+    "COMPLETE BODY TREATMENT TRAINING",
+    "BODY WRAPS",
+    "BOTANICAL SPA HIGHLIGHTS (REFRESH)",
+    "ACTIVE - METHODS (REFRESH)",
+    "DETOX - METHODS (REFRESH)",
+    "RELAX - METHODS (REFRESH)",
+    "COMPLETE BODY TREATMENT TRAINING (REFRESH)",
+    "BODY WRAPS (REFRESH)",
+    "THE RENEWAL BODY TREATMENT"
+  ]},
+  {cat:"DEMONSTRATION", selectable:false, items:[
+    "DEMONSTRATION - TEAM DR JOSEPH METHOD",
+    "DEMONSTRATION - BODY",
+    "DEMONSTRATION - THE PERFECT DEVICE",
+    "DEMONSTRATION - SUPREME EYE + FACE LIFT TREATMENT",
+    "DEMONSTRATION - REJUVENATING FACE TREATMENT",
+    "DEMONSTRATION - HOLISTIC FACE + BODY RITUAL"
+  ]},
+  {cat:"TRAIN THE TRAINER", selectable:false, items:[
+    "TRAIN THE TRAINER - SIGNATURE TREATMENT FACE (+TPD)",
+    "TRAIN THE TRAINER - COMPLETE BODY TREATMENTS",
+    "TRAIN THE TRAINER - SUPREME EYE + FACE LIFT TREATMENT",
+    "TRAIN THE TRAINER - HOLISTIC FACE + BODY RITUAL",
+    "TRAIN THE TRAINER - REJUVENATING FACE TREATMENT",
+    "TRAIN THE TRAINER - MODULIERTE MASSAGE / KONSTITUTIONSTYPEN",
+    "TRAIN THE TRAINER - BEAUTY DAY (FIRST TOUCH TREATMENT)"
+  ]},
+  {cat:"PRODUCT + SALES EXPERTISE", selectable:false, items:[
+    "HIGHTECH EXPERTISE",
+    "PRODUCT + SALES EXPERTISE (ACADEMY)",
+    "PRODUCT + SALES EXPERTISE",
+    "FROM KNOWLEDGE TO BRAND IMPACT"
+  ]},
+  {cat:"WEBINAR/ONLINE TRAINING", selectable:true, items:[]},
+  {cat:"EXKLUSIVE INDIVIDUAL TRAINING SOUTH TYROL", selectable:true, items:[]},
+  {cat:"EMPOWERING RECEPTIONISTS", selectable:true, items:[]},
+  {cat:"CLASSROOM TREATMENT", selectable:true, items:[]},
+  {cat:"INTRODUCTION TRAINING", selectable:false, items:[
+    "GESCHICHTE / PHILOSOPHIE / PRODUKTE",
+    "INTRODUCTION TEAM DR JOSEPH METHOD",
+    "INTRODUCTION TEAM DR JOSEPH BODY TREATMENTS (RITUAL)"
+  ]}
+];
+
+let trainingsList = []; // populated from localStorage or defaults at init
+const TRAININGS_STORAGE_KEY = 'tdj_trainings_v1';
+
+function loadTrainings(){
+  try{
+    const stored = localStorage.getItem(TRAININGS_STORAGE_KEY);
+    if(stored){
+      const parsed = JSON.parse(stored);
+      if(Array.isArray(parsed) && parsed.length > 0){
+        trainingsList = parsed;
+        return;
+      }
+    }
+  }catch(e){}
+  // Deep clone defaults so editing doesn't mutate the const
+  trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
+}
+
+function saveTrainings(){
+  try{
+    localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(trainingsList));
+  }catch(e){console.warn('localStorage save failed', e);}
+}
+
+function resetTrainingsToDefaults(){
+  if(!confirm('Liste auf Werkseinstellungen zurücksetzen? Alle eigenen Änderungen gehen verloren.'))return;
+  trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
+  saveTrainings();
+  renderTrainingsManager();
+}
+
+/* Return flat list of all autocomplete suggestions with category info.
+   Categories marked `selectable:true` are listed as their own suggestion
+   (alongside any sub-items they may have). */
+function getAllTrainingSuggestions(){
+  const out = [];
+  for(const cat of trainingsList){
+    if(cat.selectable){
+      out.push({text: cat.cat, category: cat.cat, isCategory: true});
+    }
+    for(const item of cat.items){
+      out.push({text: item, category: cat.cat, isCategory: false});
+    }
+  }
+  return out;
+}
+
+
 let mode='print', locked=false, rows=[], treatments=[], mapping={};
 let selectedDiploma='', detectedDiploma='', detectedDate='', parsedHotel='';
 const pdfCache={};
 
 /* ── Init ── */
 function init(){
+  loadTrainings();
   MAPPING_DATA.forEach(e=>{
     if(e.b) mapping[e.b.trim().toLowerCase()]={diploma:e.d||'',paper:e.p||''};
   });
@@ -479,11 +658,15 @@ function renderDynamicConfig(){
   if(tplInfo.treats>0){
     html+=
       '<div class="config-row" style="border-top:none"><div class="config-field grow">'+
-        '<div class="opt-lbl">Treatments (max '+tplInfo.treats+' Zeilen)</div>'+
+        '<div class="opt-lbl" style="display:flex;align-items:center;justify-content:space-between">'+
+          '<span>Treatments (max '+tplInfo.treats+' Zeilen)</span>'+
+          '<button class="btn btn-sm btn-ghost" onclick="openTrainingsManager()" title="Trainings-Liste bearbeiten">⚙ Trainings verwalten</button>'+
+        '</div>'+
         '<div id="treatments-display"><div class="empty">Noch keine Treatments importiert</div></div>'+
-        '<div class="add-treatment-row">'+
-          '<input type="text" id="add-treatment-input" placeholder="Treatment hinzufügen…" onkeydown="if(event.key===\'Enter\')addTreatment()">'+
+        '<div class="add-treatment-row" style="position:relative">'+
+          '<input type="text" id="add-treatment-input" placeholder="Treatment hinzufügen oder tippen zum Suchen…" autocomplete="off">'+
           '<button class="btn btn-sm" onclick="addTreatment()">+ Hinzufügen</button>'+
+          '<div id="add-treatment-ac" class="ac-dropdown hidden"></div>'+
         '</div>'+
       '</div></div>';
   }
@@ -491,6 +674,18 @@ function renderDynamicConfig(){
   el.innerHTML=html;
   prefillHotel();
   renderTreatments();
+  // Bind autocomplete to the main treatment input (if present)
+  if(document.getElementById('add-treatment-input')){
+    bindAutocomplete('add-treatment-input', 'add-treatment-ac', (text) => {
+      const v = text.trim();
+      if(!v) return;
+      treatments.push(v);
+      const inp = document.getElementById('add-treatment-input');
+      if(inp) inp.value = '';
+      renderTreatments();
+      hideAutocomplete('add-treatment-ac');
+    });
+  }
 }
 
 /* Pre-fill hotel fields from parsedHotel state (only if empty) */
@@ -541,6 +736,245 @@ function addTreatment(){
   const inp=document.getElementById('add-treatment-input');
   const val=inp.value.trim();if(!val)return;
   treatments.push(val);inp.value='';renderTreatments();
+  hideAutocomplete('add-treatment-ac');
+}
+
+/* ── Autocomplete system ──
+   Reusable autocomplete: bind to an input id + autocomplete-container id.
+   On focus/input: show dropdown filtered by current input value, grouped by
+   category. Click on suggestion = fill input + call commit callback. Enter
+   commits whatever is in the input (autocomplete or free text). */
+let _acState = {}; // inputId → { suggestions, highlightedIdx, onCommit }
+
+function bindAutocomplete(inputId, acContainerId, onCommit){
+  const input = document.getElementById(inputId);
+  const ac = document.getElementById(acContainerId);
+  if(!input || !ac) return;
+
+  _acState[inputId] = { highlightedIdx: -1, onCommit };
+
+  // Prevent mousedown on the dropdown from blurring the input.
+  // Item-specific click handling happens via inline onmousedown on .ac-item.
+  ac.addEventListener('mousedown', (e) => {
+    // Only prevent default if click is on non-item area (header, scrollbar, padding)
+    if(!e.target.closest('.ac-item')) e.preventDefault();
+  });
+
+  const positionDropdown = () => {
+    const r = input.getBoundingClientRect();
+    ac.style.left = r.left + 'px';
+    ac.style.top = (r.bottom + 2) + 'px';
+    ac.style.width = r.width + 'px';
+  };
+
+  const updateList = () => {
+    const q = input.value.trim().toLowerCase();
+    const all = getAllTrainingSuggestions();
+    const filtered = q
+      ? all.filter(s => s.text.toLowerCase().includes(q) || s.category.toLowerCase().includes(q))
+      : all;
+    renderAcList(acContainerId, filtered, inputId);
+    _acState[inputId].suggestions = filtered;
+    _acState[inputId].highlightedIdx = -1;
+  };
+
+  const showDropdown = () => {
+    positionDropdown();
+    updateList();
+    ac.classList.remove('hidden');
+  };
+
+  input.addEventListener('focus', showDropdown);
+  input.addEventListener('mousedown', () => {
+    // Re-open dropdown even if input already has focus (after committing
+    // a previous suggestion, focus stays — focus event won't fire again).
+    showDropdown();
+  });
+  input.addEventListener('input', () => {
+    positionDropdown();
+    updateList();
+    ac.classList.remove('hidden');
+  });
+  // Reposition on scroll/resize while dropdown is open
+  const repositionIfOpen = () => {
+    if(!ac.classList.contains('hidden')) positionDropdown();
+  };
+  window.addEventListener('scroll', repositionIfOpen, true);
+  window.addEventListener('resize', repositionIfOpen);
+
+  input.addEventListener('keydown', (e) => {
+    const state = _acState[inputId];
+    if(!state) return;
+    const sugs = state.suggestions || [];
+    if(e.key === 'ArrowDown'){
+      e.preventDefault();
+      state.highlightedIdx = Math.min(state.highlightedIdx + 1, sugs.length - 1);
+      updateHighlight(acContainerId, state.highlightedIdx);
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      state.highlightedIdx = Math.max(state.highlightedIdx - 1, -1);
+      updateHighlight(acContainerId, state.highlightedIdx);
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      if(state.highlightedIdx >= 0 && sugs[state.highlightedIdx]){
+        commitAcChoice(inputId, sugs[state.highlightedIdx].text);
+      } else {
+        commitAcChoice(inputId, input.value.trim());
+      }
+    } else if(e.key === 'Escape'){
+      hideAutocomplete(acContainerId);
+    }
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => hideAutocomplete(acContainerId), 150);
+  });
+}
+
+function renderAcList(acContainerId, suggestions, inputId){
+  const ac = document.getElementById(acContainerId);
+  if(!ac) return;
+  if(!suggestions.length){
+    ac.innerHTML = '<div class="ac-empty">Keine Treffer — Enter drücken um eigenen Eintrag zu nutzen</div>';
+    return;
+  }
+  // Group by category
+  const groups = {};
+  const order = [];
+  for(const s of suggestions){
+    if(!groups[s.category]){ groups[s.category] = []; order.push(s.category); }
+    groups[s.category].push(s);
+  }
+  let html = '';
+  let flatIdx = 0;
+  for(const catName of order){
+    // Header is not selectable; clicks pass through the container's
+    // mousedown-preventDefault so the input stays focused.
+    html += '<div class="ac-cat-header">' + esc(catName) + '</div>';
+    for(const s of groups[catName]){
+      const cls = s.isCategory ? 'ac-item ac-item-cat' : 'ac-item';
+      html += '<div class="' + cls + '" data-idx="' + flatIdx + '" '+
+        'onmousedown="event.preventDefault();commitAcChoice(\'' + inputId + '\', ' + JSON.stringify(s.text).replace(/"/g,'&quot;') + ')">' +
+        esc(s.text) + '</div>';
+      flatIdx++;
+    }
+  }
+  ac.innerHTML = html;
+}
+
+function updateHighlight(acContainerId, idx){
+  const ac = document.getElementById(acContainerId);
+  if(!ac) return;
+  ac.querySelectorAll('.ac-item').forEach(el => el.classList.remove('ac-highlighted'));
+  const target = ac.querySelector('[data-idx="' + idx + '"]');
+  if(target){
+    target.classList.add('ac-highlighted');
+    target.scrollIntoView({block:'nearest'});
+  }
+}
+
+function commitAcChoice(inputId, text){
+  const input = document.getElementById(inputId);
+  if(!input) return;
+  input.value = text;
+  const state = _acState[inputId];
+  if(state && state.onCommit) state.onCommit(text);
+}
+
+function hideAutocomplete(acContainerId){
+  const ac = document.getElementById(acContainerId);
+  if(ac) ac.classList.add('hidden');
+}
+
+/* ── Trainings Manager Modal ── */
+function openTrainingsManager(){
+  document.getElementById('trainings-modal').classList.remove('hidden');
+  renderTrainingsManager();
+}
+function closeTrainingsManager(){
+  document.getElementById('trainings-modal').classList.add('hidden');
+}
+
+function renderTrainingsManager(){
+  const el = document.getElementById('trainings-manager-body');
+  if(!el) return;
+  let html = '';
+  trainingsList.forEach((cat, ci) => {
+    html += '<div class="tm-cat">';
+    html += '<div class="tm-cat-header">';
+    html += '<input class="tm-cat-name" value="' + esc(cat.cat) + '" '+
+      'onchange="trainingsList['+ci+'].cat=this.value;saveTrainings()">';
+    html += '<label class="tm-toggle"><input type="checkbox" '+(cat.selectable?'checked':'')+
+      ' onchange="trainingsList['+ci+'].selectable=this.checked;saveTrainings();renderTrainingsManager()"> ' +
+      'als Training auswählbar</label>';
+    html += '<button class="btn btn-sm btn-ghost" onclick="deleteCategory('+ci+')" title="Kategorie löschen">×</button>';
+    html += '</div>';
+
+    if(cat.items.length > 0){
+      html += '<ul class="tm-items">';
+      cat.items.forEach((item, ii) => {
+        html += '<li>';
+        html += '<input value="' + esc(item) + '" '+
+          'onchange="trainingsList['+ci+'].items['+ii+']=this.value;saveTrainings()">';
+        html += '<button class="tm-remove" onclick="deleteTraining('+ci+','+ii+')">×</button>';
+        html += '</li>';
+      });
+      html += '</ul>';
+    } else if(!cat.selectable){
+      html += '<div class="tm-empty">Keine Trainings — Kategorie als "auswählbar" markieren falls sie selbst ein Training sein soll</div>';
+    }
+
+    html += '<div class="tm-add-row">'+
+      '<input id="tm-add-input-'+ci+'" placeholder="Neues Training in dieser Kategorie…" '+
+      'onkeydown="if(event.key===\'Enter\')addTrainingToCategory('+ci+')">'+
+      '<button class="btn btn-sm" onclick="addTrainingToCategory('+ci+')">+ Hinzufügen</button>'+
+      '</div>';
+    html += '</div>';
+  });
+
+  html += '<div class="tm-add-cat">'+
+    '<input id="tm-new-cat-input" placeholder="Neue Kategorie hinzufügen…" '+
+    'onkeydown="if(event.key===\'Enter\')addCategory()">'+
+    '<button class="btn btn-sm" onclick="addCategory()">+ Neue Kategorie</button>'+
+    '</div>';
+
+  el.innerHTML = html;
+}
+
+function addTrainingToCategory(ci){
+  const inp = document.getElementById('tm-add-input-' + ci);
+  const val = (inp?.value || '').trim();
+  if(!val) return;
+  trainingsList[ci].items.push(val);
+  saveTrainings();
+  renderTrainingsManager();
+}
+
+function deleteTraining(ci, ii){
+  if(!confirm('Training "' + trainingsList[ci].items[ii] + '" löschen?')) return;
+  trainingsList[ci].items.splice(ii, 1);
+  saveTrainings();
+  renderTrainingsManager();
+}
+
+function deleteCategory(ci){
+  const cat = trainingsList[ci];
+  const itemCount = cat.items.length;
+  const msg = itemCount > 0
+    ? 'Kategorie "'+cat.cat+'" mit '+itemCount+' Trainings komplett löschen?'
+    : 'Leere Kategorie "'+cat.cat+'" löschen?';
+  if(!confirm(msg)) return;
+  trainingsList.splice(ci, 1);
+  saveTrainings();
+  renderTrainingsManager();
+}
+
+function addCategory(){
+  const inp = document.getElementById('tm-new-cat-input');
+  const val = (inp?.value || '').trim();
+  if(!val) return;
+  trainingsList.push({cat: val, selectable: false, items: []});
+  saveTrainings();
+  renderTrainingsManager();
 }
 
 /* ── Participants table ── */
@@ -581,78 +1015,167 @@ function updateGenBtn(){
 function selectAll(v){rows.forEach(r=>r.checked=v);renderTable();}
 function toggleAll(cb){rows.forEach(r=>r.checked=cb.checked);renderTable();}
 
-/* ── PDF loading (cached) ── */
-async function loadPdf(name,herb){
-  const key=name+(herb?'|herb':'');
+/* ── PDF loading (cached) ──
+   The "large" parameter loads the version with 8 treatment slots.
+   When large=false, loads the small version (4 or 5 slots) — used as default
+   for In-House diplomas when treatments fit. If small variant doesn't exist
+   on server (404), the caller is expected to fall back to large. */
+async function loadPdf(name,herb,large){
+  const key=name+(herb?'|herb':'')+(large?'|large':'');
   if(pdfCache[key])return pdfCache[key];
   try{
-    const res=await fetch('templates/TEAM DR JOSEPH Diploma '+name+(herb?' - Herbarium':'')+'.pdf');
+    const largePart=large?' - Large':'';
+    const herbPart=herb?' - Herbarium':'';
+    const url='templates/TEAM DR JOSEPH Diploma '+name+largePart+herbPart+'.pdf';
+    const res=await fetch(url);
     if(!res.ok)return null;
     pdfCache[key]=new Uint8Array(await res.arrayBuffer());
     return pdfCache[key];
   }catch(e){return null;}
 }
 
-/* ── Distribute treatments in diamond layout ──
-   - Sort treatments by length (shortest → longest)
-   - If count ≤ n_slots: every treatment gets its own line (singles)
-   - If count > n_slots: pair the SHORTEST items together (2 per line),
-     keep the LONGEST as singles. Need exactly (count - n_slots) pairs.
-   - Arrange in diamond shape: longest in center, shortest at edges (top+bottom).
-     Empty slots distributed symmetrically around the diamond.
+/* Smart loader for In-House diplomas: prefer SMALL template if treatments fit,
+   fall back to LARGE otherwise. Returns {bytes, useSmall, slotsUsed}. */
+async function loadInhousePdf(diploma, herb, treatments){
+  const tplInfo=TEMPLATE_FIELDS[diploma];
+  if(!tplInfo) return null;
+  const largeSlots=tplInfo.treats||8;
+  const smallSlots=tplInfo.smallSlots||0;
 
-   Result: longest treatments visually centered, line lengths decreasing
-   outward — looks balanced regardless of input count. */
-function distributeTreatments(list,n){
-  const slots=Array(n).fill('');
-  if(!list.length||n<=0)return slots;
-
-  // Sort by length, shortest first
-  const sorted=[...list].sort((a,b)=>a.length-b.length);
-
-  // Build items: each entry is one line's content (single or paired)
-  let items;
-  if(sorted.length<=n){
-    items=sorted; // every treatment on its own line
-  } else {
-    // Need (sorted.length - n) pairs to fit; pair shortest items, single the longest
-    const numPairs=sorted.length-n;
-    const toPair=sorted.slice(0,numPairs*2);   // shortest 2*numPairs items
-    const singles=sorted.slice(numPairs*2);    // longer items remain as singles
-    const pairs=[];
-    for(let i=0;i<numPairs;i++) pairs.push(toPair[2*i]+' / '+toPair[2*i+1]);
-    // Re-sort pairs by combined length so they fit diamond logic
-    pairs.sort((a,b)=>a.length-b.length);
-    items=[...pairs,...singles]; // shortest-content first, longest-content last
+  // Try small version first if it exists and treatments would fit
+  if(tplInfo.smallExists && smallSlots>0){
+    const trySmall=distributeTreatmentsTry(treatments, smallSlots);
+    if(trySmall){
+      let bytes=await loadPdf(diploma, herb, false); // small version
+      if(!bytes && herb) bytes=await loadPdf(diploma, false, false); // try non-herb small
+      if(!bytes && !herb) bytes=await loadPdf(diploma, true, false); // try herb small
+      if(bytes) return {bytes, useSmall:true, slots:trySmall.slots, slotsUsed:smallSlots};
+    }
   }
 
-  // Compute center-out slot indices
-  // n=8: midpoints are 3,4 → centerOut=[4,3,5,2,6,1,7,0]
-  // n=5: midpoint is 2 → centerOut=[2,3,1,4,0]
+  // Fall back to large version
+  let bytes=await loadPdf(diploma, herb, true);
+  if(!bytes && herb) bytes=await loadPdf(diploma, false, true);
+  if(!bytes && !herb) bytes=await loadPdf(diploma, true, true);
+  // Also try the base name without "- Large" as ultimate fallback (compat with old setups)
+  if(!bytes) bytes=await loadPdf(diploma, herb, false);
+  if(!bytes && herb) bytes=await loadPdf(diploma, false, false);
+  if(!bytes && !herb) bytes=await loadPdf(diploma, true, false);
+  if(!bytes) return null;
+  const tryLarge=distributeTreatmentsTry(treatments, largeSlots);
+  const slots=tryLarge?tryLarge.slots:distributeTreatments(treatments, largeSlots);
+  return {bytes, useSmall:false, slots, slotsUsed:largeSlots};
+}
+
+/* ── Diamond Distribution ──
+   Best-arrangement algorithm:
+   - ≤5 treatments: prefer all singles; fall back to pairing if needed
+   - >5 treatments: prefer max pairing (compact); fall back if pairs too long
+   - Smart pair-splitting: if a paired line > MAX_LINE_CHARS, split into 2 singles
+   - Arrange lines so longest sits in center, others symmetrically outward
+   - Empty slots: extra empty goes at bottom (Math.floor of empty/2 above)
+
+   Returns null if treatments don't fit in maxSlots at all (caller should
+   try larger template). Returns {slots, linesUsed} on success. */
+
+const MAX_LINE_CHARS=62;
+
+function _arrangeDiamond(lines){
+  const sorted=[...lines].sort((a,b)=>b.length-a.length); // longest first
+  const n=sorted.length;
+  const slots=new Array(n);
   const centerOut=[];
   if(n%2===0){
     const upMid=n/2-1, downMid=n/2;
-    centerOut.push(downMid,upMid);
-    let up=upMid-1,down=downMid+1;
+    centerOut.push(upMid,downMid);
+    let up=upMid-1, down=downMid+1;
     while(up>=0||down<n){
-      if(down<n)centerOut.push(down++);
       if(up>=0)centerOut.push(up--);
+      if(down<n)centerOut.push(down++);
     }
   } else {
     const mid=Math.floor(n/2);
     centerOut.push(mid);
-    let up=mid-1,down=mid+1;
+    let up=mid-1, down=mid+1;
     while(up>=0||down<n){
-      if(down<n)centerOut.push(down++);
       if(up>=0)centerOut.push(up--);
+      if(down<n)centerOut.push(down++);
     }
   }
+  for(let i=0;i<sorted.length;i++) slots[centerOut[i]]=sorted[i];
+  return slots;
+}
 
-  // Place longest item first into center slot, work outward
-  const placeOrder=items.slice().reverse(); // longest first
-  for(let i=0;i<placeOrder.length&&i<n;i++){
-    slots[centerOut[i]]=placeOrder[i];
+function _diamondScore(slots){
+  const n=slots.length;
+  if(n<=1)return 100;
+  const midIdx=(n-1)/2;
+  let score=0;
+  for(let i=0;i<n-1;i++){
+    const distI=Math.abs(i-midIdx);
+    const distJ=Math.abs(i+1-midIdx);
+    const innerLen=(distI<distJ?slots[i]:slots[i+1]).length;
+    const outerLen=(distI<distJ?slots[i+1]:slots[i]).length;
+    if(innerLen>=outerLen)score+=1;
+    else score-=10;
   }
+  return score;
+}
+
+function _buildLinesSmart(items, pairsCount){
+  const sorted=[...items].sort((a,b)=>a.length-b.length);
+  const toPair=sorted.slice(0,pairsCount*2);
+  const singles=sorted.slice(pairsCount*2);
+  const lines=[];
+  for(let i=0;i<pairsCount;i++){
+    const a=toPair[2*i], b=toPair[2*i+1];
+    const joined=a+' / '+b;
+    if(joined.length<=MAX_LINE_CHARS) lines.push(joined);
+    else { lines.push(a); lines.push(b); }
+  }
+  lines.push(...singles);
+  return lines;
+}
+
+/* Returns null if can't fit, else {slots: array of length maxSlots, linesUsed} */
+function distributeTreatmentsTry(items, maxSlots){
+  if(!items.length) return {slots:new Array(maxSlots).fill(''), linesUsed:0};
+  const n=items.length;
+  let candidates=[];
+  if(n<=5){
+    candidates.push({pairsCount:0, priority:100});
+    for(let p=1;p<=Math.floor(n/2);p++) candidates.push({pairsCount:p, priority:50-p});
+  } else {
+    const maxPairs=Math.floor(n/2);
+    candidates.push({pairsCount:maxPairs, priority:100});
+    for(let p=maxPairs-1;p>=0;p--) candidates.push({pairsCount:p, priority:50-(maxPairs-p)});
+  }
+  let best=null;
+  for(const c of candidates){
+    const lines=_buildLinesSmart(items,c.pairsCount);
+    if(lines.length>maxSlots) continue;
+    const arranged=_arrangeDiamond(lines);
+    const score=_diamondScore(arranged);
+    const totalScore=c.priority+score*10;
+    if(!best||totalScore>best.totalScore){
+      best={arranged, totalLines:lines.length, totalScore};
+    }
+  }
+  if(!best) return null;
+  const result=new Array(maxSlots).fill('');
+  const empty=maxSlots-best.totalLines;
+  const emptyTop=Math.floor(empty/2);
+  for(let i=0;i<best.totalLines;i++) result[emptyTop+i]=best.arranged[i];
+  return {slots:result, linesUsed:best.totalLines};
+}
+
+/* Legacy entrypoint: returns just the slots array (compat with existing callers) */
+function distributeTreatments(list,n){
+  const r=distributeTreatmentsTry(list,n);
+  if(r) return r.slots;
+  // Doesn't fit: degraded fallback — truncate to n items
+  const slots=new Array(n).fill('');
+  for(let i=0;i<Math.min(list.length,n);i++) slots[i]=list[i];
   return slots;
 }
 
@@ -817,8 +1340,11 @@ async function mergePdfs(pdfBytesArr, shouldFlatten){
   return await base.save({updateFieldAppearances:false});
 }
 
-/* ── Build field values for a diploma ── */
-function buildFieldValues(name, dateStr, diploma, hotelZ1, hotelZ2, location, treatmentList){
+/* ── Build field values for a diploma ──
+   If slotInfo is provided (from loadInhousePdf), uses its pre-distributed slots
+   and total slot count (small or large template). Otherwise computes via
+   distributeTreatments with tplInfo.treats. */
+function buildFieldValues(name, dateStr, diploma, hotelZ1, hotelZ2, location, treatmentList, slotInfo){
   const tplInfo=TEMPLATE_FIELDS[diploma]||{treats:0,hotel:false,location:false};
   const isInhouse=INHOUSE_DIPLOMAS.has(diploma);
   const fv={};
@@ -830,8 +1356,9 @@ function buildFieldValues(name, dateStr, diploma, hotelZ1, hotelZ2, location, tr
       fv['HOTEL NAME Z2']=hotelZ2.toUpperCase();
     }
     if(tplInfo.location) fv['LOCATION']=location.toUpperCase();
-    const tLines=distributeTreatments(treatmentList,tplInfo.treats||4);
-    for(let t=0;t<(tplInfo.treats||4);t++) fv['TREATMENT Z'+(t+1)]=tLines[t];
+    const slots=slotInfo?slotInfo.slots:distributeTreatments(treatmentList,tplInfo.treats||4);
+    const count=slotInfo?slotInfo.slotsUsed:(tplInfo.treats||4);
+    for(let t=0;t<count;t++) fv['TREATMENT Z'+(t+1)]=slots[t]||'';
   }
   return fv;
 }
@@ -853,19 +1380,29 @@ async function generate(exportMode){
   prog.style.display='block';log.textContent='';fill.style.width='0%';
   lbl.textContent='Generiere '+toGen.length+' Diplome…';
 
-  const wantHerb=mode==='digital';
-  let bytes=await loadPdf(diploma,wantHerb);
-  if(!bytes&&wantHerb) bytes=await loadPdf(diploma,false);
-  if(!bytes&&!wantHerb) bytes=await loadPdf(diploma,true);
-  if(!bytes){
-    lbl.textContent='✗ PDF-Vorlage nicht gefunden: „'+diploma+'"';
-    btnS.disabled=false;btnZ.disabled=false;return;
-  }
-
   const dateStr=getActiveDate();
   const hotelZ1=(document.getElementById('hotel1-input')?.value||'').trim();
   const hotelZ2=(document.getElementById('hotel2-input')?.value||'').trim();
   const location=(document.getElementById('location-input')?.value||'').trim();
+
+  const wantHerb=mode==='digital';
+  const isInhouse=INHOUSE_DIPLOMAS.has(diploma);
+  let bytes=null, slotInfo=null;
+
+  if(isInhouse){
+    // Smart loader: prefer small template, fall back to large
+    slotInfo=await loadInhousePdf(diploma, wantHerb, treatments);
+    if(slotInfo) bytes=slotInfo.bytes;
+  } else {
+    // Academy diplomas: just load the single template
+    bytes=await loadPdf(diploma, wantHerb, false);
+    if(!bytes && wantHerb) bytes=await loadPdf(diploma, false, false);
+    if(!bytes && !wantHerb) bytes=await loadPdf(diploma, true, false);
+  }
+  if(!bytes){
+    lbl.textContent='✗ PDF-Vorlage nicht gefunden: „'+diploma+'"';
+    btnS.disabled=false;btnZ.disabled=false;return;
+  }
 
   const pdfs=[];
   let ok=0,fail=0;
@@ -873,7 +1410,7 @@ async function generate(exportMode){
   for(let i=0;i<toGen.length;i++){
     const p=toGen[i];
     try{
-      const fv=buildFieldValues(p.name,dateStr,diploma,hotelZ1,hotelZ2,location,treatments);
+      const fv=buildFieldValues(p.name,dateStr,diploma,hotelZ1,hotelZ2,location,treatments, slotInfo);
       const out=await fillPdfRawDict(bytes,fv,locked);
       const safe=p.name.replace(/[^a-zA-Z0-9 äöüÄÖÜß\-]/g,'').trim().replace(/ /g,'_');
       pdfs.push({name:safe,bytes:out});
@@ -969,12 +1506,59 @@ function qUpdateFields(defaultDate){
       html+='<div class="modal-row"><label>Location</label><input type="text" id="q-location" placeholder="z.B. Hotel Adler, Bozen"></div>';
     }
     if(tplInfo.treats>0){
-      html+='<div class="modal-row"><label>Treatments (eine pro Zeile, max '+tplInfo.treats+')</label>'+
-        '<textarea id="q-treats" rows="'+Math.min(tplInfo.treats,5)+'" placeholder="Signature Face Treatment&#10;Supreme Eye Lift&#10;…"></textarea></div>';
+      html+='<div class="modal-row"><label style="display:flex;align-items:center;justify-content:space-between">'+
+        '<span>Treatments (max '+tplInfo.treats+' Zeilen)</span>'+
+        '<button class="btn btn-sm btn-ghost" onclick="openTrainingsManager()" style="font-weight:400">⚙ Verwalten</button>'+
+        '</label>'+
+        '<div id="q-treatments-display" class="q-treatments-display"></div>'+
+        '<div class="add-treatment-row" style="position:relative">'+
+          '<input type="text" id="q-add-treatment-input" placeholder="Treatment hinzufügen oder tippen zum Suchen…" autocomplete="off">'+
+          '<button class="btn btn-sm" onclick="qAddTreatment()">+ Hinzufügen</button>'+
+          '<div id="q-add-treatment-ac" class="ac-dropdown hidden"></div>'+
+        '</div>'+
+        '</div>';
     }
   }
   document.getElementById('q-dynamic-fields').innerHTML=html;
   setTimeout(()=>document.getElementById('q-name')?.focus(),20);
+
+  // Bind autocomplete in Quick-Generate Modal
+  if(document.getElementById('q-add-treatment-input')){
+    qTreatments = [];
+    qRenderTreatments();
+    bindAutocomplete('q-add-treatment-input', 'q-add-treatment-ac', (text) => {
+      const v = text.trim();
+      if(!v) return;
+      qTreatments.push(v);
+      const inp = document.getElementById('q-add-treatment-input');
+      if(inp) inp.value = '';
+      qRenderTreatments();
+      hideAutocomplete('q-add-treatment-ac');
+    });
+  }
+}
+
+let qTreatments = [];
+function qRenderTreatments(){
+  const el=document.getElementById('q-treatments-display');
+  if(!el)return;
+  if(!qTreatments.length){
+    el.innerHTML='<div class="empty">Noch keine Treatments hinzugefügt</div>';
+    return;
+  }
+  el.innerHTML='<ul class="treatment-list">'+qTreatments.map((t,i)=>
+    '<li class="treatment-item">'+
+      '<input class="treatment-edit" value="'+esc(t)+'" onchange="qTreatments['+i+']=this.value" style="width:'+Math.max(100,t.length*7)+'px">'+
+      '<span class="treatment-remove" onclick="qRemoveTreatment('+i+')">×</span>'+
+    '</li>'
+  ).join('')+'</ul>';
+}
+function qRemoveTreatment(idx){qTreatments.splice(idx,1);qRenderTreatments();}
+function qAddTreatment(){
+  const inp=document.getElementById('q-add-treatment-input');
+  const val=inp.value.trim();if(!val)return;
+  qTreatments.push(val);inp.value='';qRenderTreatments();
+  hideAutocomplete('q-add-treatment-ac');
 }
 
 function closeQuick(){
@@ -995,16 +1579,23 @@ async function quickGenerate(){
   const hotel1  =(document.getElementById('q-hotel1')?.value||'').trim();
   const hotel2  =(document.getElementById('q-hotel2')?.value||'').trim();
   const location=(document.getElementById('q-location')?.value||'').trim();
-  const treatList=(document.getElementById('q-treats')?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const treatList=qTreatments.slice();
 
   const wantHerb=qMode==='digital';
-  let bytes=await loadPdf(diploma,wantHerb);
-  if(!bytes&&wantHerb) bytes=await loadPdf(diploma,false);
-  if(!bytes&&!wantHerb) bytes=await loadPdf(diploma,true);
+  const isInhouse=INHOUSE_DIPLOMAS.has(diploma);
+  let bytes=null, slotInfo=null;
+  if(isInhouse){
+    slotInfo=await loadInhousePdf(diploma, wantHerb, treatList);
+    if(slotInfo) bytes=slotInfo.bytes;
+  } else {
+    bytes=await loadPdf(diploma, wantHerb, false);
+    if(!bytes && wantHerb) bytes=await loadPdf(diploma, false, false);
+    if(!bytes && !wantHerb) bytes=await loadPdf(diploma, true, false);
+  }
   if(!bytes){alert('PDF-Vorlage nicht gefunden: „'+diploma+'"');return;}
 
   try{
-    const fv=buildFieldValues(name,date,diploma,hotel1,hotel2,location,treatList);
+    const fv=buildFieldValues(name,date,diploma,hotel1,hotel2,location,treatList,slotInfo);
     const out=await fillPdfRawDict(bytes,fv,qLocked);
     const safe=name.replace(/[^a-zA-Z0-9 äöüÄÖÜß\-]/g,'').trim().replace(/ /g,'_');
     const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
