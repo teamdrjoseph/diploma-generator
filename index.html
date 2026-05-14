@@ -112,6 +112,11 @@
   .tm-add-cat{display:flex;gap:6px;margin-top:14px;padding-top:14px;border-top:2px dashed var(--border)}
   .tm-add-cat input{flex:1;padding:7px 10px;font-size:11px;border:1px solid var(--border);background:var(--warm);font-family:inherit;outline:none;border-radius:1px}
 
+  /* Info banner in trainings manager */
+  .tm-info{padding:8px 12px;font-size:10px;border-radius:1px;margin-bottom:12px;line-height:1.4}
+  .tm-info-ok{background:#ECF3EC;color:#4A7A4A;border:1px solid var(--sage-border)}
+  .tm-info-warn{background:#FBF6EC;color:#8A6D3B;border:1px solid #E8D9B5}
+
   /* Quick-Generate treatment chips display */
   .q-treatments-display{min-height:28px;padding:6px;border:1px solid var(--border);border-radius:1px;background:var(--bg);margin-bottom:6px}
   .q-treatments-display .empty{font-size:10px;color:var(--light);font-style:italic;padding:4px}
@@ -154,6 +159,7 @@
     <div class="modal-body" id="trainings-manager-body"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="resetTrainingsToDefaults()">Auf Werkseinstellungen zurücksetzen</button>
+      <button class="btn btn-ghost" onclick="promptForGithubToken()" title="Token zum Teilen von Änderungen einrichten">⚿ Token</button>
       <div id="tm-sync-status" style="flex:1;font-size:10px;color:var(--light);text-align:center"></div>
       <button class="btn btn-p" onclick="closeTrainingsManager()">Fertig</button>
     </div>
@@ -401,16 +407,50 @@ let trainingsList = []; // populated from localStorage or defaults at init
 const TRAININGS_STORAGE_KEY = 'tdj_trainings_v1';
 
 /* GitHub-backed shared trainings list.
-   - On startup: fetch trainings.json from GitHub via raw URL (anonymous read).
-   - On change: PUT updated JSON via GitHub Contents API (auth via token).
-   - localStorage is used as a cache + offline fallback only.
-   ⚠ Token is embedded in client code → only acceptable for a low-stakes
-   shared list. Token has Contents:Write access to ONE repo only. */
+   - Anyone can READ via the public raw URL (no token needed since repo is public)
+   - Only users with a personal token configured (in their browser's localStorage)
+     can WRITE. To configure: click "Token einrichten" in the manager modal.
+   - The token is NEVER stored in the code → won't be auto-revoked by GitHub. */
 const GITHUB_OWNER = 'teamdrjoseph';
 const GITHUB_REPO = 'diploma-generator';
 const GITHUB_BRANCH = 'main';
 const GITHUB_PATH = 'trainings.json';
-const GITHUB_TOKEN = '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';
+const GITHUB_TOKEN_STORAGE_KEY = 'tdj_gh_token_v1';
+
+function getGithubToken(){
+  try{ return localStorage.getItem(GITHUB_TOKEN_STORAGE_KEY) || ''; }catch(e){ return ''; }
+}
+function setGithubToken(token){
+  try{
+    if(token && token.trim()){
+      localStorage.setItem(GITHUB_TOKEN_STORAGE_KEY, token.trim());
+    } else {
+      localStorage.removeItem(GITHUB_TOKEN_STORAGE_KEY);
+    }
+  }catch(e){}
+}
+function hasGithubToken(){
+  const t = getGithubToken();
+  return t && t.length > 10;
+}
+
+function promptForGithubToken(){
+  const current = getGithubToken();
+  const msg = 'GitHub Personal Access Token eingeben:\n\n'+
+    'Damit kannst du \u00c4nderungen an der Trainings-Liste mit allen anderen Nutzern teilen.\n\n'+
+    'Token wird nur in DIESEM Browser gespeichert (localStorage) \u2014 nicht im Code.\n\n'+
+    'Leerlassen um Token zu entfernen.';
+  const result = window.prompt(msg, current);
+  if(result === null) return false; // cancelled
+  setGithubToken(result);
+  if(result && result.trim()){
+    alert('Token gespeichert. \u00c4nderungen werden ab jetzt mit allen Nutzern geteilt.');
+    return true;
+  } else {
+    alert('Token entfernt. \u00c4nderungen werden nur noch lokal gespeichert.');
+    return false;
+  }
+}
 
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/'+GITHUB_BRANCH+'/'+GITHUB_PATH;
 const GITHUB_API_URL = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_PATH;
@@ -419,8 +459,7 @@ let _githubSha = null; // SHA of the current trainings.json, needed for PUT
 let _saveDebounceTimer = null;
 
 async function loadTrainings(){
-  // 1) Synchronously seed from localStorage cache or defaults so UI works
-  //    immediately, then asynchronously refresh from GitHub.
+  // 1) Seed synchronously from localStorage so UI works immediately
   let seeded = false;
   try{
     const stored = localStorage.getItem(TRAININGS_STORAGE_KEY);
@@ -436,17 +475,16 @@ async function loadTrainings(){
     trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
   }
 
-  // 2) Fetch latest from GitHub in background. Use API (not raw URL) so we
-  //    also get the SHA needed for subsequent writes.
+  // 2) Try to fetch latest from GitHub. Public repo → use raw URL (no token).
+  //    Also fetch SHA from API (with token if available) for future writes.
   try{
+    // Use API endpoint so we get SHA. Works for public repos without auth too.
     const headers = {'Accept':'application/vnd.github+json'};
-    if(GITHUB_TOKEN && GITHUB_TOKEN !== 'PASTE_YOUR_TOKEN_HERE'){
-      headers['Authorization'] = 'Bearer ' + GITHUB_TOKEN;
-    }
+    const token = getGithubToken();
+    if(token) headers['Authorization'] = 'Bearer ' + token;
     const res = await fetch(GITHUB_API_URL+'?ref='+GITHUB_BRANCH+'&t='+Date.now(), {headers, cache:'no-store'});
     if(res.status === 404){
-      // File doesn't exist on remote yet — keep defaults, no SHA yet
-      console.log('trainings.json not on GitHub yet — will create on first save');
+      // File doesn't exist yet — first write will create it
       _githubSha = null;
       return;
     }
@@ -458,7 +496,7 @@ async function loadTrainings(){
     if(Array.isArray(remoteList) && remoteList.length > 0){
       trainingsList = remoteList;
       try{ localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(trainingsList)); }catch(e){}
-      // If the manager modal is open, re-render it with fresh data
+      // Re-render manager if open
       const mgrModal = document.getElementById('trainings-modal');
       if(mgrModal && !mgrModal.classList.contains('hidden')) renderTrainingsManager();
     }
@@ -473,22 +511,26 @@ async function saveTrainings(){
     localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(trainingsList));
   }catch(e){console.warn('localStorage save failed', e);}
 
-  // Debounce GitHub writes — rapid edits (typing) shouldn't fire one commit
-  // per keystroke. Wait 1.5s after last edit, then push.
+  // Only push to GitHub if a token is configured. Otherwise: local-only mode.
+  if(!hasGithubToken()){
+    _updateSyncStatus('Nur lokal gespeichert (kein Token konfiguriert)');
+    return;
+  }
+
+  // Debounce: wait 1.5s after last edit before committing
   if(_saveDebounceTimer) clearTimeout(_saveDebounceTimer);
   _saveDebounceTimer = setTimeout(() => { _pushTrainingsToGithub(); }, 1500);
 }
 
 async function _pushTrainingsToGithub(){
-  if(!GITHUB_TOKEN || GITHUB_TOKEN === 'PASTE_YOUR_TOKEN_HERE'){
-    console.warn('GitHub token not configured — changes only saved locally');
-    _updateSyncStatus('⚠ Nur lokal gespeichert (kein Token konfiguriert)');
+  const token = getGithubToken();
+  if(!token){
+    _updateSyncStatus('Nur lokal gespeichert (kein Token konfiguriert)');
     return;
   }
   _updateSyncStatus('↻ Speichere…');
   try{
     const content = JSON.stringify(trainingsList, null, 2);
-    // btoa needs UTF-8 → use TextEncoder for safety with special chars
     const utf8Bytes = new TextEncoder().encode(content);
     let binary = '';
     utf8Bytes.forEach(b => binary += String.fromCharCode(b));
@@ -504,7 +546,7 @@ async function _pushTrainingsToGithub(){
     const res = await fetch(GITHUB_API_URL, {
       method: 'PUT',
       headers: {
-        'Authorization': 'Bearer ' + GITHUB_TOKEN,
+        'Authorization': 'Bearer ' + token,
         'Accept': 'application/vnd.github+json',
         'Content-Type': 'application/json'
       },
@@ -512,15 +554,19 @@ async function _pushTrainingsToGithub(){
     });
     if(!res.ok){
       const errText = await res.text();
+      if(res.status === 401 || res.status === 403){
+        _updateSyncStatus('✗ Token ungültig — bitte neu einrichten');
+      } else {
+        _updateSyncStatus('✗ Speichern fehlgeschlagen: '+res.status);
+      }
       throw new Error('GitHub save failed: '+res.status+' '+errText.slice(0,200));
     }
     const result = await res.json();
     _githubSha = result.content.sha;
-    _updateSyncStatus('✓ Auf GitHub gespeichert');
-    setTimeout(() => _updateSyncStatus(''), 3000);
+    _updateSyncStatus('✓ Auf GitHub gespeichert — alle Nutzer sehen die Änderung');
+    setTimeout(() => _updateSyncStatus(''), 4000);
   }catch(e){
     console.error('GitHub push failed:', e);
-    _updateSyncStatus('✗ GitHub-Sync fehlgeschlagen — lokal gesichert');
     setTimeout(() => _updateSyncStatus(''), 5000);
   }
 }
@@ -531,7 +577,7 @@ function _updateSyncStatus(msg){
 }
 
 function resetTrainingsToDefaults(){
-  if(!confirm('Liste auf Werkseinstellungen zurücksetzen? Alle eigenen Änderungen gehen verloren — auch für andere Nutzer.'))return;
+  if(!confirm('Liste auf Werkseinstellungen zurücksetzen? Alle eigenen Änderungen gehen verloren — und werden auch für andere Nutzer überschrieben falls du einen Token hast.'))return;
   trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
   saveTrainings();
   renderTrainingsManager();
@@ -1015,6 +1061,15 @@ function renderTrainingsManager(){
   const el = document.getElementById('trainings-manager-body');
   if(!el) return;
   let html = '';
+
+  // Info banner about sync status
+  if(hasGithubToken()){
+    html += '<div class="tm-info tm-info-ok">✓ Änderungen werden mit allen Nutzern geteilt (GitHub-Sync aktiv)</div>';
+  } else {
+    html += '<div class="tm-info tm-info-warn">⚠ Änderungen werden nur lokal in deinem Browser gespeichert. '+
+      'Klick auf <b>⚿ Token</b> unten um Änderungen mit allen Nutzern zu teilen.</div>';
+  }
+
   trainingsList.forEach((cat, ci) => {
     html += '<div class="tm-cat">';
     html += '<div class="tm-cat-header">';
