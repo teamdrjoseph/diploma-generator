@@ -684,7 +684,7 @@ function renderDynamicConfig(){
       if(inp) inp.value = '';
       renderTreatments();
       hideAutocomplete('add-treatment-ac');
-    });
+    }, () => treatments);
   }
 }
 
@@ -746,12 +746,12 @@ function addTreatment(){
    commits whatever is in the input (autocomplete or free text). */
 let _acState = {}; // inputId → { suggestions, highlightedIdx, onCommit }
 
-function bindAutocomplete(inputId, acContainerId, onCommit){
+function bindAutocomplete(inputId, acContainerId, onCommit, getExcluded){
   const input = document.getElementById(inputId);
   const ac = document.getElementById(acContainerId);
   if(!input || !ac) return;
 
-  _acState[inputId] = { highlightedIdx: -1, onCommit };
+  _acState[inputId] = { highlightedIdx: -1, onCommit, getExcluded };
 
   // Prevent mousedown on the dropdown from blurring the input.
   // Item-specific click handling happens via inline onmousedown on .ac-item.
@@ -770,9 +770,19 @@ function bindAutocomplete(inputId, acContainerId, onCommit){
   const updateList = () => {
     const q = input.value.trim().toLowerCase();
     const all = getAllTrainingSuggestions();
-    const filtered = q
-      ? all.filter(s => s.text.toLowerCase().includes(q) || s.category.toLowerCase().includes(q))
-      : all;
+    // Exclude already-selected items (case-insensitive comparison)
+    const exclSet = new Set();
+    if(typeof getExcluded === 'function'){
+      try {
+        const ex = getExcluded() || [];
+        ex.forEach(t => exclSet.add(String(t).trim().toLowerCase()));
+      } catch(e){}
+    }
+    const filtered = all.filter(s => {
+      if(exclSet.has(s.text.trim().toLowerCase())) return false;
+      if(!q) return true;
+      return s.text.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
+    });
     renderAcList(acContainerId, filtered, inputId);
     _acState[inputId].suggestions = filtered;
     _acState[inputId].highlightedIdx = -1;
@@ -1427,9 +1437,10 @@ async function generate(exportMode){
   lbl.textContent='Datei wird erstellt…';
 
   if(exportMode==='zip'){
-    // One PDF per person in a ZIP
+    // One PDF per person in a ZIP. File names follow the ZIP pattern with
+    // person name appended: "TDJ_<Diploma>_<Date>_<Name>.pdf"
     const zip=new JSZip();
-    pdfs.forEach(p=>zip.file(p.name+'.pdf',p.bytes));
+    pdfs.forEach(p=>zip.file(baseName+'_'+p.name+'.pdf',p.bytes));
     const blob=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
@@ -1544,7 +1555,7 @@ function qUpdateFields(defaultDate){
       if(inp) inp.value = '';
       qRenderTreatments();
       hideAutocomplete('q-add-treatment-ac');
-    });
+    }, () => qTreatments);
   }
 }
 
@@ -1608,8 +1619,10 @@ async function quickGenerate(){
     const fv=buildFieldValues(name,date,diploma,hotel1,hotel2,location,treatList,slotInfo);
     const out=await fillPdfRawDict(bytes,fv,qLocked);
     const safe=name.replace(/[^a-zA-Z0-9 äöüÄÖÜß\-]/g,'').trim().replace(/ /g,'_');
+    const baseName='TDJ_'+diploma.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_')+'_'+new Date().toISOString().slice(0,10);
+    const fileName=baseName+'_'+safe+'.pdf';
     const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
-    const a=document.createElement('a');a.href=url;a.download=safe+'.pdf';a.click();URL.revokeObjectURL(url);
+    const a=document.createElement('a');a.href=url;a.download=fileName;a.click();URL.revokeObjectURL(url);
     // Keep modal open — clear only name, show confirmation
     const status=document.getElementById('q-status');
     if(status){status.textContent='✓ '+name+' — heruntergeladen';setTimeout(()=>{if(status)status.textContent='';},3000);}
