@@ -117,6 +117,12 @@
   .tm-info-ok{background:#ECF3EC;color:#4A7A4A;border:1px solid var(--sage-border)}
   .tm-info-warn{background:#FBF6EC;color:#8A6D3B;border:1px solid #E8D9B5}
 
+  /* Read-only display when no token configured */
+  .tm-cat-readonly{opacity:.85}
+  .tm-cat-name-readonly{flex:1;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text);padding:4px 6px}
+  .tm-toggle-readonly{font-size:10px;color:var(--light);font-style:italic}
+  .tm-item-readonly{flex:1;padding:5px 8px;font-size:11px;color:var(--text);background:transparent}
+
   /* Quick-Generate treatment chips display */
   .q-treatments-display{min-height:28px;padding:6px;border:1px solid var(--border);border-radius:1px;background:var(--bg);margin-bottom:6px}
   .q-treatments-display .empty{font-size:10px;color:var(--light);font-style:italic;padding:4px}
@@ -577,6 +583,10 @@ function _updateSyncStatus(msg){
 }
 
 function resetTrainingsToDefaults(){
+  if(!hasGithubToken()){
+    alert('Zum Zurücksetzen brauchst du einen Token. Klick auf "⚿ Token" unten.');
+    return;
+  }
   if(!confirm('Liste auf Werkseinstellungen zurücksetzen? Alle eigenen Änderungen gehen verloren — und werden auch für andere Nutzer überschrieben falls du einen Token hast.'))return;
   trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
   saveTrainings();
@@ -1060,54 +1070,74 @@ function closeTrainingsManager(){
 function renderTrainingsManager(){
   const el = document.getElementById('trainings-manager-body');
   if(!el) return;
+  const canEdit = hasGithubToken();
   let html = '';
 
-  // Info banner about sync status
-  if(hasGithubToken()){
+  // Info banner — prominent and clear if no token configured
+  if(canEdit){
     html += '<div class="tm-info tm-info-ok">✓ Änderungen werden mit allen Nutzern geteilt (GitHub-Sync aktiv)</div>';
   } else {
-    html += '<div class="tm-info tm-info-warn">⚠ Änderungen werden nur lokal in deinem Browser gespeichert. '+
-      'Klick auf <b>⚿ Token</b> unten um Änderungen mit allen Nutzern zu teilen.</div>';
+    html += '<div class="tm-info tm-info-warn">'+
+      '<div style="font-weight:700;margin-bottom:6px;font-size:11px">⚠ Bearbeitung gesperrt — kein Token konfiguriert</div>'+
+      '<div style="margin-bottom:8px">Trainings-Liste ist im <b>Lesemodus</b>. Um Änderungen vornehmen zu können (für ALLE Nutzer), brauchst du einen GitHub Personal Access Token. '+
+      'Frage Johanna nach dem Token, dann klick unten auf <b>"⚿ Token einrichten"</b>.</div>'+
+      '<button class="btn btn-sm btn-p" onclick="promptForGithubToken();renderTrainingsManager()">⚿ Token einrichten</button>'+
+      '</div>';
   }
 
   trainingsList.forEach((cat, ci) => {
-    html += '<div class="tm-cat">';
+    html += '<div class="tm-cat'+(canEdit?'':' tm-cat-readonly')+'">';
     html += '<div class="tm-cat-header">';
-    html += '<input class="tm-cat-name" value="' + esc(cat.cat) + '" '+
-      'onchange="trainingsList['+ci+'].cat=this.value;saveTrainings()">';
-    html += '<label class="tm-toggle"><input type="checkbox" '+(cat.selectable?'checked':'')+
-      ' onchange="trainingsList['+ci+'].selectable=this.checked;saveTrainings();renderTrainingsManager()"> ' +
-      'als Training auswählbar</label>';
-    html += '<button class="btn btn-sm btn-ghost" onclick="deleteCategory('+ci+')" title="Kategorie löschen">×</button>';
+    if(canEdit){
+      html += '<input class="tm-cat-name" value="' + esc(cat.cat) + '" '+
+        'onchange="trainingsList['+ci+'].cat=this.value;saveTrainings()">';
+      html += '<label class="tm-toggle"><input type="checkbox" '+(cat.selectable?'checked':'')+
+        ' onchange="trainingsList['+ci+'].selectable=this.checked;saveTrainings();renderTrainingsManager()"> ' +
+        'als Training auswählbar</label>';
+      html += '<button class="btn btn-sm btn-ghost" onclick="deleteCategory('+ci+')" title="Kategorie löschen">×</button>';
+    } else {
+      html += '<div class="tm-cat-name-readonly">' + esc(cat.cat) + '</div>';
+      if(cat.selectable){
+        html += '<span class="tm-toggle-readonly">✓ als Training auswählbar</span>';
+      }
+    }
     html += '</div>';
 
     if(cat.items.length > 0){
       html += '<ul class="tm-items">';
       cat.items.forEach((item, ii) => {
         html += '<li>';
-        html += '<input value="' + esc(item) + '" '+
-          'onchange="trainingsList['+ci+'].items['+ii+']=this.value;saveTrainings()">';
-        html += '<button class="tm-remove" onclick="deleteTraining('+ci+','+ii+')">×</button>';
+        if(canEdit){
+          html += '<input value="' + esc(item) + '" '+
+            'onchange="trainingsList['+ci+'].items['+ii+']=this.value;saveTrainings()">';
+          html += '<button class="tm-remove" onclick="deleteTraining('+ci+','+ii+')">×</button>';
+        } else {
+          html += '<div class="tm-item-readonly">' + esc(item) + '</div>';
+        }
         html += '</li>';
       });
       html += '</ul>';
-    } else if(!cat.selectable){
+    } else if(!cat.selectable && canEdit){
       html += '<div class="tm-empty">Keine Trainings — Kategorie als "auswählbar" markieren falls sie selbst ein Training sein soll</div>';
     }
 
-    html += '<div class="tm-add-row">'+
-      '<input id="tm-add-input-'+ci+'" placeholder="Neues Training in dieser Kategorie…" '+
-      'onkeydown="if(event.key===\'Enter\')addTrainingToCategory('+ci+')">'+
-      '<button class="btn btn-sm" onclick="addTrainingToCategory('+ci+')">+ Hinzufügen</button>'+
-      '</div>';
+    if(canEdit){
+      html += '<div class="tm-add-row">'+
+        '<input id="tm-add-input-'+ci+'" placeholder="Neues Training in dieser Kategorie…" '+
+        'onkeydown="if(event.key===\'Enter\')addTrainingToCategory('+ci+')">'+
+        '<button class="btn btn-sm" onclick="addTrainingToCategory('+ci+')">+ Hinzufügen</button>'+
+        '</div>';
+    }
     html += '</div>';
   });
 
-  html += '<div class="tm-add-cat">'+
-    '<input id="tm-new-cat-input" placeholder="Neue Kategorie hinzufügen…" '+
-    'onkeydown="if(event.key===\'Enter\')addCategory()">'+
-    '<button class="btn btn-sm" onclick="addCategory()">+ Neue Kategorie</button>'+
-    '</div>';
+  if(canEdit){
+    html += '<div class="tm-add-cat">'+
+      '<input id="tm-new-cat-input" placeholder="Neue Kategorie hinzufügen…" '+
+      'onkeydown="if(event.key===\'Enter\')addCategory()">'+
+      '<button class="btn btn-sm" onclick="addCategory()">+ Neue Kategorie</button>'+
+      '</div>';
+  }
 
   el.innerHTML = html;
 }
