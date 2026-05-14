@@ -1492,7 +1492,17 @@ function qUpdateFields(defaultDate){
   const fallback=String(today.getDate()).padStart(2,'0')+'/'+String(today.getMonth()+1).padStart(2,'0')+'/'+today.getFullYear();
   const useDate=defaultDate||document.getElementById('q-date')?.value||fallback;
 
-  let html=
+  // Paper badge based on diploma
+  let paperBadge='';
+  if(diploma){
+    const paper=DIPLOMA_PAPER[diploma]||'';
+    if(paper){
+      const cls=paper.toLowerCase()==='kornblume'?'paper-kornblume':'paper-wassernabel';
+      paperBadge='<div class="modal-row"><label>Papier</label><span class="'+cls+'">'+esc(paper)+'</span></div>';
+    }
+  }
+
+  let html=paperBadge+
     '<div class="modal-row"><label>Name</label><input type="text" id="q-name" placeholder="Vorname Nachname"></div>'+
     '<div class="modal-row"><label>Datum</label><input type="text" id="q-date" value="'+useDate+'" placeholder="TT/MM/JJJJ"></div>';
 
