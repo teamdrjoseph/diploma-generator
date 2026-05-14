@@ -1147,36 +1147,66 @@ function _buildLinesSmart(items, pairsCount){
   return lines;
 }
 
+/* Best-Fit pairing: pack items into the minimum number of lines, where each
+   line may contain 1 or 2 items, and combined length ≤ MAX_LINE_CHARS.
+   Returns an array of line strings. */
+function _packLines(items){
+  // Sort descending by length so we place longest first
+  const sorted=[...items].sort((a,b)=>b.length-a.length);
+  const lines=[]; // each entry: {text, length, count}
+  for(const it of sorted){
+    // Try to add to an existing line as a pair, only if line currently has 1 item
+    // and combined length fits
+    let bestIdx=-1, bestSlack=Infinity;
+    for(let i=0;i<lines.length;i++){
+      const l=lines[i];
+      if(l.count>=2) continue;
+      const combinedLen=l.length+3+it.length;
+      if(combinedLen<=MAX_LINE_CHARS){
+        // Prefer line where adding leaves smallest slack (tightest fit)
+        const slack=MAX_LINE_CHARS-combinedLen;
+        if(slack<bestSlack){ bestSlack=slack; bestIdx=i; }
+      }
+    }
+    if(bestIdx>=0){
+      const l=lines[bestIdx];
+      l.text=l.text+' / '+it;
+      l.length=l.text.length;
+      l.count=2;
+    } else {
+      lines.push({text:it, length:it.length, count:1});
+    }
+  }
+  return lines.map(l=>l.text);
+}
+
 /* Returns null if can't fit, else {slots: array of length maxSlots, linesUsed} */
 function distributeTreatmentsTry(items, maxSlots){
   if(!items.length) return {slots:new Array(maxSlots).fill(''), linesUsed:0};
   const n=items.length;
-  let candidates=[];
+
+  // ≤5 items: preserve "all singles" preference for clean look
+  // >5 items: pack greedily to minimize line count
+  let lines;
   if(n<=5){
-    candidates.push({pairsCount:0, priority:100});
-    for(let p=1;p<=Math.floor(n/2);p++) candidates.push({pairsCount:p, priority:50-p});
-  } else {
-    const maxPairs=Math.floor(n/2);
-    candidates.push({pairsCount:maxPairs, priority:100});
-    for(let p=maxPairs-1;p>=0;p--) candidates.push({pairsCount:p, priority:50-(maxPairs-p)});
-  }
-  let best=null;
-  for(const c of candidates){
-    const lines=_buildLinesSmart(items,c.pairsCount);
-    if(lines.length>maxSlots) continue;
-    const arranged=_arrangeDiamond(lines);
-    const score=_diamondScore(arranged);
-    const totalScore=c.priority+score*10;
-    if(!best||totalScore>best.totalScore){
-      best={arranged, totalLines:lines.length, totalScore};
+    // First try all singles
+    if(n<=maxSlots){
+      lines=[...items];
+    } else {
+      lines=_packLines(items);
     }
+  } else {
+    lines=_packLines(items);
   }
-  if(!best) return null;
+
+  if(lines.length>maxSlots) return null;
+
+  const arranged=_arrangeDiamond(lines);
   const result=new Array(maxSlots).fill('');
-  const empty=maxSlots-best.totalLines;
+  const empty=maxSlots-arranged.length;
   const emptyTop=Math.floor(empty/2);
-  for(let i=0;i<best.totalLines;i++) result[emptyTop+i]=best.arranged[i];
-  return {slots:result, linesUsed:best.totalLines};
+  for(let i=0;i<arranged.length;i++) result[emptyTop+i]=arranged[i];
+  return {slots:result, linesUsed:arranged.length};
 }
 
 /* Legacy entrypoint: returns just the slots array (compat with existing callers) */
