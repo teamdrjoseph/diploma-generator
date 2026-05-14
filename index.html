@@ -154,6 +154,7 @@
     <div class="modal-body" id="trainings-manager-body"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="resetTrainingsToDefaults()">Auf Werkseinstellungen zurücksetzen</button>
+      <div id="tm-sync-status" style="flex:1;font-size:10px;color:var(--light);text-align:center"></div>
       <button class="btn btn-p" onclick="closeTrainingsManager()">Fertig</button>
     </div>
   </div>
@@ -257,13 +258,13 @@ const MAPPING_DATA=[
   {b:"TEAM DR JOSEPH Method",d:"In-House Training",p:"Wassernabel"},
   {b:"ADVANCED TRAINING COSMETIC KNOW-HOW",d:"",p:""},
   {b:"THE PERFECT DEVICE",d:"In-House Training",p:"Wassernabel"},
-  {b:"SUPREME EYE + FACE LIFT TREATMENT",d:"Supreme Eye Face Lift Treatment",p:"Kornblume"},
+  {b:"SUPREME EYE + FACE LIFT TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment",p:"Kornblume"},
   {b:"HOLISTIC FACE + BODY RITUAL",d:"Holistic Face Body Ritual",p:"Kornblume"},
   {b:"SIGNATURE TREATMENT TRAINING",d:"Signature Treatment Training",p:"Kornblume"},
   {b:"REJUVENATING FACE TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment",p:"Kornblume"},
   {b:"*REFRESH* TEAM DR JOSEPH Method",d:"In-House Training",p:"Wassernabel"},
   {b:"*REFRESH* THE PERFECT DEVICE",d:"In-House Training",p:"Wassernabel"},
-  {b:"*REFRESH* SUPREME EYE + FACE LIFT TREATMENT",d:"Supreme Eye Face Lift Treatment",p:"Kornblume"},
+  {b:"*REFRESH* SUPREME EYE + FACE LIFT TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment",p:"Kornblume"},
   {b:"*REFRESH* HOLISTIC FACE + BODY RITUAL",d:"Holistic Face Body Ritual",p:"Kornblume"},
   {b:"*REFRESH* SIGNATURE TREATMENT TRAINING",d:"Signature Treatment Training",p:"Kornblume"},
   {b:"*REFRESH* REJUVENATING FACE TREATMENT",d:"Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment",p:"Kornblume"},
@@ -303,11 +304,11 @@ const MAPPING_DATA=[
   {b:"Introduction TEAM DR JOSEPH Body Treatments (Ritual)",d:"Introduction Training",p:"Kornblume"}
 ];
 
-const ALL_DIPLOMAS=["Complete Body Treatment Training","Complete Body Treatment Training Theory","Deep Dive","Empowering Receptionists","From Knowledge To Brand Impact","Holistic Face Body Ritual","In-House Training","Individual Training","Individual Training Body","Individual Training Face","Introduction Training","Private Training","Signature Treatment Training","Signature Treatment Training Theory","Supreme Eye Face Lift Treatment","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory"];
+const ALL_DIPLOMAS=["Complete Body Treatment Training","Complete Body Treatment Training Theory","Deep Dive","Empowering Receptionists","From Knowledge To Brand Impact","Holistic Face Body Ritual","In-House Training","Introduction Training","Private Training","Signature Treatment Training","Signature Treatment Training Theory","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory"];
 
-const INHOUSE_DIPLOMAS=new Set(["In-House Training","Individual Training","Individual Training Body","Individual Training Face","Introduction Training","Private Training"]);
+const INHOUSE_DIPLOMAS=new Set(["In-House Training","Introduction Training","Private Training"]);
 
-const DIPLOMA_PAPER={"Complete Body Treatment Training":"Wassernabel","Complete Body Treatment Training Theory":"Wassernabel","Deep Dive":"Kornblume","Empowering Receptionists":"Wassernabel","From Knowledge To Brand Impact":"Wassernabel","Holistic Face Body Ritual":"Kornblume","In-House Training":"Wassernabel","Individual Training":"Kornblume","Individual Training Body":"Wassernabel","Individual Training Face":"Wassernabel","Introduction Training":"Kornblume","Private Training":"Wassernabel","Signature Treatment Training":"Kornblume","Signature Treatment Training Theory":"Kornblume","Supreme Eye Face Lift Treatment":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory":"Kornblume"};
+const DIPLOMA_PAPER={"Complete Body Treatment Training":"Wassernabel","Complete Body Treatment Training Theory":"Wassernabel","Deep Dive":"Kornblume","Empowering Receptionists":"Wassernabel","From Knowledge To Brand Impact":"Wassernabel","Holistic Face Body Ritual":"Kornblume","In-House Training":"Wassernabel","Introduction Training":"Kornblume","Private Training":"Wassernabel","Signature Treatment Training":"Kornblume","Signature Treatment Training Theory":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment":"Kornblume","Supreme Eye Face Lift Treatment - Rejuvenating Face Treatment Theory":"Kornblume"};
 
 /* Field structure per inhouse template.
    - treats: max slots (LARGE version = always 8)
@@ -318,9 +319,6 @@ const DIPLOMA_PAPER={"Complete Body Treatment Training":"Wassernabel","Complete 
    per variant. */
 const TEMPLATE_FIELDS={
   "In-House Training":       {treats:8, smallSlots:5, smallExists:true,  hotel:true,  location:false},
-  "Individual Training":     {treats:8, smallSlots:4, smallExists:true,  hotel:true,  location:false},
-  "Individual Training Body":{treats:8, smallSlots:4, smallExists:true,  hotel:true,  location:false},
-  "Individual Training Face":{treats:8, smallSlots:4, smallExists:false, hotel:true,  location:false},
   "Introduction Training":   {treats:8, smallSlots:4, smallExists:true,  hotel:false, location:true},
   "Private Training":        {treats:8, smallSlots:5, smallExists:true,  hotel:true,  location:false}
 };
@@ -402,29 +400,138 @@ const TRAININGS_DEFAULTS=[
 let trainingsList = []; // populated from localStorage or defaults at init
 const TRAININGS_STORAGE_KEY = 'tdj_trainings_v1';
 
-function loadTrainings(){
+/* GitHub-backed shared trainings list.
+   - On startup: fetch trainings.json from GitHub via raw URL (anonymous read).
+   - On change: PUT updated JSON via GitHub Contents API (auth via token).
+   - localStorage is used as a cache + offline fallback only.
+   ⚠ Token is embedded in client code → only acceptable for a low-stakes
+   shared list. Token has Contents:Write access to ONE repo only. */
+const GITHUB_OWNER = 'teamdrjoseph';
+const GITHUB_REPO = 'diploma-generator';
+const GITHUB_BRANCH = 'main';
+const GITHUB_PATH = 'trainings.json';
+const GITHUB_TOKEN = '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';
+
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/'+GITHUB_BRANCH+'/'+GITHUB_PATH;
+const GITHUB_API_URL = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_PATH;
+
+let _githubSha = null; // SHA of the current trainings.json, needed for PUT
+let _saveDebounceTimer = null;
+
+async function loadTrainings(){
+  // 1) Synchronously seed from localStorage cache or defaults so UI works
+  //    immediately, then asynchronously refresh from GitHub.
+  let seeded = false;
   try{
     const stored = localStorage.getItem(TRAININGS_STORAGE_KEY);
     if(stored){
       const parsed = JSON.parse(stored);
       if(Array.isArray(parsed) && parsed.length > 0){
         trainingsList = parsed;
-        return;
+        seeded = true;
       }
     }
   }catch(e){}
-  // Deep clone defaults so editing doesn't mutate the const
-  trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
+  if(!seeded){
+    trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
+  }
+
+  // 2) Fetch latest from GitHub in background. Use API (not raw URL) so we
+  //    also get the SHA needed for subsequent writes.
+  try{
+    const headers = {'Accept':'application/vnd.github+json'};
+    if(GITHUB_TOKEN && GITHUB_TOKEN !== 'PASTE_YOUR_TOKEN_HERE'){
+      headers['Authorization'] = 'Bearer ' + GITHUB_TOKEN;
+    }
+    const res = await fetch(GITHUB_API_URL+'?ref='+GITHUB_BRANCH+'&t='+Date.now(), {headers, cache:'no-store'});
+    if(res.status === 404){
+      // File doesn't exist on remote yet — keep defaults, no SHA yet
+      console.log('trainings.json not on GitHub yet — will create on first save');
+      _githubSha = null;
+      return;
+    }
+    if(!res.ok) throw new Error('GitHub fetch failed: '+res.status);
+    const data = await res.json();
+    _githubSha = data.sha;
+    const content = atob(data.content.replace(/\s/g,''));
+    const remoteList = JSON.parse(content);
+    if(Array.isArray(remoteList) && remoteList.length > 0){
+      trainingsList = remoteList;
+      try{ localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(trainingsList)); }catch(e){}
+      // If the manager modal is open, re-render it with fresh data
+      const mgrModal = document.getElementById('trainings-modal');
+      if(mgrModal && !mgrModal.classList.contains('hidden')) renderTrainingsManager();
+    }
+  }catch(e){
+    console.warn('Could not load trainings from GitHub, using local copy:', e.message);
+  }
 }
 
-function saveTrainings(){
+async function saveTrainings(){
+  // Always write to localStorage immediately (fast feedback, works offline)
   try{
     localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(trainingsList));
   }catch(e){console.warn('localStorage save failed', e);}
+
+  // Debounce GitHub writes — rapid edits (typing) shouldn't fire one commit
+  // per keystroke. Wait 1.5s after last edit, then push.
+  if(_saveDebounceTimer) clearTimeout(_saveDebounceTimer);
+  _saveDebounceTimer = setTimeout(() => { _pushTrainingsToGithub(); }, 1500);
+}
+
+async function _pushTrainingsToGithub(){
+  if(!GITHUB_TOKEN || GITHUB_TOKEN === 'PASTE_YOUR_TOKEN_HERE'){
+    console.warn('GitHub token not configured — changes only saved locally');
+    _updateSyncStatus('⚠ Nur lokal gespeichert (kein Token konfiguriert)');
+    return;
+  }
+  _updateSyncStatus('↻ Speichere…');
+  try{
+    const content = JSON.stringify(trainingsList, null, 2);
+    // btoa needs UTF-8 → use TextEncoder for safety with special chars
+    const utf8Bytes = new TextEncoder().encode(content);
+    let binary = '';
+    utf8Bytes.forEach(b => binary += String.fromCharCode(b));
+    const base64 = btoa(binary);
+
+    const body = {
+      message: 'Update trainings list',
+      content: base64,
+      branch: GITHUB_BRANCH
+    };
+    if(_githubSha) body.sha = _githubSha;
+
+    const res = await fetch(GITHUB_API_URL, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'Bearer ' + GITHUB_TOKEN,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      throw new Error('GitHub save failed: '+res.status+' '+errText.slice(0,200));
+    }
+    const result = await res.json();
+    _githubSha = result.content.sha;
+    _updateSyncStatus('✓ Auf GitHub gespeichert');
+    setTimeout(() => _updateSyncStatus(''), 3000);
+  }catch(e){
+    console.error('GitHub push failed:', e);
+    _updateSyncStatus('✗ GitHub-Sync fehlgeschlagen — lokal gesichert');
+    setTimeout(() => _updateSyncStatus(''), 5000);
+  }
+}
+
+function _updateSyncStatus(msg){
+  const el = document.getElementById('tm-sync-status');
+  if(el) el.textContent = msg;
 }
 
 function resetTrainingsToDefaults(){
-  if(!confirm('Liste auf Werkseinstellungen zurücksetzen? Alle eigenen Änderungen gehen verloren.'))return;
+  if(!confirm('Liste auf Werkseinstellungen zurücksetzen? Alle eigenen Änderungen gehen verloren — auch für andere Nutzer.'))return;
   trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
   saveTrainings();
   renderTrainingsManager();
@@ -980,11 +1087,27 @@ function deleteCategory(ci){
 
 function addCategory(){
   const inp = document.getElementById('tm-new-cat-input');
-  const val = (inp?.value || '').trim();
-  if(!val) return;
+  if(!inp){console.warn('tm-new-cat-input nicht gefunden');return;}
+  const val = (inp.value || '').trim();
+  if(!val){
+    inp.focus();
+    return;
+  }
+  // Avoid duplicate category names
+  if(trainingsList.some(c => c.cat.trim().toLowerCase() === val.toLowerCase())){
+    alert('Kategorie "' + val + '" existiert bereits.');
+    return;
+  }
   trainingsList.push({cat: val, selectable: false, items: []});
   saveTrainings();
   renderTrainingsManager();
+  // Scroll to the newly added category and focus its "add training" input
+  setTimeout(() => {
+    const modalBody = document.getElementById('trainings-manager-body');
+    if(modalBody) modalBody.scrollTop = modalBody.scrollHeight;
+    const newItemInp = document.getElementById('tm-add-input-' + (trainingsList.length - 1));
+    if(newItemInp) newItemInp.focus();
+  }, 0);
 }
 
 /* ── Participants table ── */
