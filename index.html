@@ -1046,20 +1046,26 @@ async function loadPdf(name,herb,large){
 
 /* Smart loader for In-House diplomas: prefer SMALL template if treatments fit,
    fall back to LARGE otherwise. Returns {bytes, useSmall, slotsUsed}. */
+/* Smart loader for In-House diplomas:
+   - Prefers SMALL template if treatments fit (single page)
+   - Falls back to LARGE template otherwise
+   - If still too many treatments → returns multiple pages
+   Returns {bytes, pages, useSmall, slotsPerPage} where pages is array of
+   {slots: array, linesUsed: number}. bytes is the template to use for ALL pages. */
 async function loadInhousePdf(diploma, herb, treatments){
   const tplInfo=TEMPLATE_FIELDS[diploma];
   if(!tplInfo) return null;
   const largeSlots=tplInfo.treats||8;
   const smallSlots=tplInfo.smallSlots||0;
 
-  // Try small version first if it exists and treatments would fit
+  // Try small version first if it exists and treatments would fit on ONE page
   if(tplInfo.smallExists && smallSlots>0){
     const trySmall=distributeTreatmentsTry(treatments, smallSlots);
     if(trySmall){
       let bytes=await loadPdf(diploma, herb, false); // small version
-      if(!bytes && herb) bytes=await loadPdf(diploma, false, false); // try non-herb small
-      if(!bytes && !herb) bytes=await loadPdf(diploma, true, false); // try herb small
-      if(bytes) return {bytes, useSmall:true, slots:trySmall.slots, slotsUsed:smallSlots};
+      if(!bytes && herb) bytes=await loadPdf(diploma, false, false);
+      if(!bytes && !herb) bytes=await loadPdf(diploma, true, false);
+      if(bytes) return {bytes, useSmall:true, slotsPerPage:smallSlots, pages:[trySmall]};
     }
   }
 
@@ -1067,14 +1073,15 @@ async function loadInhousePdf(diploma, herb, treatments){
   let bytes=await loadPdf(diploma, herb, true);
   if(!bytes && herb) bytes=await loadPdf(diploma, false, true);
   if(!bytes && !herb) bytes=await loadPdf(diploma, true, true);
-  // Also try the base name without "- Large" as ultimate fallback (compat with old setups)
+  // Ultimate fallback: base name without "- Large"
   if(!bytes) bytes=await loadPdf(diploma, herb, false);
   if(!bytes && herb) bytes=await loadPdf(diploma, false, false);
   if(!bytes && !herb) bytes=await loadPdf(diploma, true, false);
   if(!bytes) return null;
-  const tryLarge=distributeTreatmentsTry(treatments, largeSlots);
-  const slots=tryLarge?tryLarge.slots:distributeTreatments(treatments, largeSlots);
-  return {bytes, useSmall:false, slots, slotsUsed:largeSlots};
+
+  // Multi-page: distribute across multiple pages if treatments exceed largeSlots
+  const pages=distributeMultiPage(treatments, largeSlots);
+  return {bytes, useSmall:false, slotsPerPage:largeSlots, pages};
 }
 
 /* ── Diamond Distribution ──
@@ -1209,7 +1216,8 @@ function distributeTreatmentsTry(items, maxSlots){
   return {slots:result, linesUsed:arranged.length};
 }
 
-/* Legacy entrypoint: returns just the slots array (compat with existing callers) */
+/* Legacy entrypoint: returns just the slots array (compat with existing callers).
+   For single-page use only — multi-page distribution: use distributeMultiPage. */
 function distributeTreatments(list,n){
   const r=distributeTreatmentsTry(list,n);
   if(r) return r.slots;
@@ -1217,6 +1225,47 @@ function distributeTreatments(list,n){
   const slots=new Array(n).fill('');
   for(let i=0;i<Math.min(list.length,n);i++) slots[i]=list[i];
   return slots;
+}
+
+/* Multi-page distribution. Returns array of pages, each {slots, linesUsed}.
+   - If all fit on one page → returns 1 page
+   - Else: splits evenly across N pages, each with its own diamond layout
+   - Each page gets the same name/date/hotel header (handled by caller) */
+function distributeMultiPage(items, maxSlots){
+  if(!items.length) return [{slots:new Array(maxSlots).fill(''), linesUsed:0}];
+
+  // Try single page first
+  const single=distributeTreatmentsTry(items, maxSlots);
+  if(single) return [single];
+
+  // Need multiple pages. Try N=2,3,...10 pages with even distribution.
+  for(let nPages=2; nPages<=10; nPages++){
+    const itemsPerPage=Math.ceil(items.length/nPages);
+    const pages=[];
+    let ok=true;
+    for(let p=0; p<nPages; p++){
+      const start=p*itemsPerPage;
+      if(start>=items.length) break;
+      const end=Math.min(start+itemsPerPage, items.length);
+      const pageItems=items.slice(start, end);
+      const pageResult=distributeTreatmentsTry(pageItems, maxSlots);
+      if(!pageResult){ ok=false; break; }
+      pages.push(pageResult);
+    }
+    if(ok) return pages;
+  }
+
+  // Hard fallback: 1 item per slot, chunked
+  const fallbackPages=[];
+  let idx=0;
+  while(idx<items.length){
+    const pageItems=items.slice(idx, idx+maxSlots);
+    const pageSlots=new Array(maxSlots).fill('');
+    for(let i=0;i<pageItems.length;i++) pageSlots[i]=pageItems[i];
+    fallbackPages.push({slots:pageSlots, linesUsed:pageItems.length});
+    idx+=maxSlots;
+  }
+  return fallbackPages;
 }
 
 /* Decode a PDFString or PDFHexString to a plain JS string (handles UTF-16 BE) */
@@ -1380,11 +1429,11 @@ async function mergePdfs(pdfBytesArr, shouldFlatten){
   return await base.save({updateFieldAppearances:false});
 }
 
-/* ── Build field values for a diploma ──
-   If slotInfo is provided (from loadInhousePdf), uses its pre-distributed slots
-   and total slot count (small or large template). Otherwise computes via
-   distributeTreatments with tplInfo.treats. */
-function buildFieldValues(name, dateStr, diploma, hotelZ1, hotelZ2, location, treatmentList, slotInfo){
+/* ── Build field values for a diploma page ──
+   `page` = a single page object {slots, linesUsed} from distributeMultiPage.
+   `slotsPerPage` = total slots in template (4-5 small or 8 large).
+   If no page provided, falls back to legacy single-page distribution. */
+function buildFieldValues(name, dateStr, diploma, hotelZ1, hotelZ2, location, treatmentList, slotInfo, page){
   const tplInfo=TEMPLATE_FIELDS[diploma]||{treats:0,hotel:false,location:false};
   const isInhouse=INHOUSE_DIPLOMAS.has(diploma);
   const fv={};
@@ -1396,8 +1445,20 @@ function buildFieldValues(name, dateStr, diploma, hotelZ1, hotelZ2, location, tr
       fv['HOTEL NAME Z2']=hotelZ2.toUpperCase();
     }
     if(tplInfo.location) fv['LOCATION']=location.toUpperCase();
-    const slots=slotInfo?slotInfo.slots:distributeTreatments(treatmentList,tplInfo.treats||4);
-    const count=slotInfo?slotInfo.slotsUsed:(tplInfo.treats||4);
+
+    // Determine slots: from page (multi-page) or fallback
+    let slots, count;
+    if(page){
+      slots=page.slots;
+      count=slotInfo?slotInfo.slotsPerPage:(tplInfo.treats||4);
+    } else if(slotInfo && slotInfo.pages && slotInfo.pages.length){
+      // Use first page if no specific page provided
+      slots=slotInfo.pages[0].slots;
+      count=slotInfo.slotsPerPage;
+    } else {
+      slots=distributeTreatments(treatmentList,tplInfo.treats||4);
+      count=tplInfo.treats||4;
+    }
     for(let t=0;t<count;t++) fv['TREATMENT Z'+(t+1)]=slots[t]||'';
   }
   return fv;
@@ -1446,15 +1507,30 @@ async function generate(exportMode){
 
   const pdfs=[];
   let ok=0,fail=0;
+  // Number of pages per person — same for all (it's based on treatment count)
+  const pagesCount=(slotInfo && slotInfo.pages) ? slotInfo.pages.length : 1;
 
   for(let i=0;i<toGen.length;i++){
     const p=toGen[i];
     try{
-      const fv=buildFieldValues(p.name,dateStr,diploma,hotelZ1,hotelZ2,location,treatments, slotInfo);
-      const out=await fillPdfRawDict(bytes,fv,locked);
+      let personPdfBytes;
+      if(pagesCount>1 && slotInfo && slotInfo.pages){
+        // Multi-page: fill one PDF per page, then merge them
+        const pagePdfs=[];
+        for(let pg=0; pg<slotInfo.pages.length; pg++){
+          const fv=buildFieldValues(p.name,dateStr,diploma,hotelZ1,hotelZ2,location,treatments, slotInfo, slotInfo.pages[pg]);
+          const out=await fillPdfRawDict(bytes,fv,locked);
+          pagePdfs.push(out);
+        }
+        personPdfBytes=await mergePdfs(pagePdfs, locked);
+      } else {
+        // Single page
+        const fv=buildFieldValues(p.name,dateStr,diploma,hotelZ1,hotelZ2,location,treatments, slotInfo);
+        personPdfBytes=await fillPdfRawDict(bytes,fv,locked);
+      }
       const safe=p.name.replace(/[^a-zA-Z0-9 äöüÄÖÜß\-]/g,'').trim().replace(/ /g,'_');
-      pdfs.push({name:safe,bytes:out});
-      log.textContent+='✓  '+p.name+'\n';ok++;
+      pdfs.push({name:safe,bytes:personPdfBytes});
+      log.textContent+='✓  '+p.name+(pagesCount>1?' ('+pagesCount+' Seiten)':'')+'\n';ok++;
     }catch(e){
       log.textContent+='✗  '+p.name+' – '+e.message+'\n';fail++;
     }
@@ -1646,16 +1722,29 @@ async function quickGenerate(){
   if(!bytes){alert('PDF-Vorlage nicht gefunden: „'+diploma+'"');return;}
 
   try{
-    const fv=buildFieldValues(name,date,diploma,hotel1,hotel2,location,treatList,slotInfo);
-    const out=await fillPdfRawDict(bytes,fv,qLocked);
+    let outBytes;
+    const pagesCount=(slotInfo && slotInfo.pages) ? slotInfo.pages.length : 1;
+    if(pagesCount>1 && slotInfo && slotInfo.pages){
+      // Multi-page: fill one PDF per page, then merge
+      const pagePdfs=[];
+      for(let pg=0; pg<slotInfo.pages.length; pg++){
+        const fv=buildFieldValues(name,date,diploma,hotel1,hotel2,location,treatList,slotInfo, slotInfo.pages[pg]);
+        const out=await fillPdfRawDict(bytes,fv,qLocked);
+        pagePdfs.push(out);
+      }
+      outBytes=await mergePdfs(pagePdfs, qLocked);
+    } else {
+      const fv=buildFieldValues(name,date,diploma,hotel1,hotel2,location,treatList,slotInfo);
+      outBytes=await fillPdfRawDict(bytes,fv,qLocked);
+    }
     const safe=name.replace(/[^a-zA-Z0-9 äöüÄÖÜß\-]/g,'').trim().replace(/ /g,'_');
     const baseName='TDJ_'+diploma.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_')+'_'+new Date().toISOString().slice(0,10);
     const fileName=baseName+'_'+safe+'.pdf';
-    const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+    const url=URL.createObjectURL(new Blob([outBytes],{type:'application/pdf'}));
     const a=document.createElement('a');a.href=url;a.download=fileName;a.click();URL.revokeObjectURL(url);
     // Keep modal open — clear only name, show confirmation
     const status=document.getElementById('q-status');
-    if(status){status.textContent='✓ '+name+' — heruntergeladen';setTimeout(()=>{if(status)status.textContent='';},3000);}
+    if(status){status.textContent='✓ '+name+(pagesCount>1?' ('+pagesCount+' Seiten)':'')+' — heruntergeladen';setTimeout(()=>{if(status)status.textContent='';},3000);}
     const nameEl=document.getElementById('q-name');
     if(nameEl){nameEl.value='';nameEl.focus();}
   }catch(e){alert('Fehler: '+e.message);}
