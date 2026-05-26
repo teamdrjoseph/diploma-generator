@@ -78,7 +78,7 @@
   .modal-row label{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--light)}
   .modal-row input,.modal-row select,.modal-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:1px;font-family:inherit;font-size:11px;background:var(--warm);color:var(--text);outline:none}
   .modal-row input:focus,.modal-row select:focus,.modal-row textarea:focus{border-color:var(--text)}
-  .modal-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+  .modal-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
   .modal-wide{width:680px;max-width:96vw}
 
   /* Buttons — ghost variant */
@@ -183,7 +183,7 @@
     </div>
     <div class="modal-body" id="trainings-manager-body"></div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="openPrioRulesModal()" title="Welche Treatments oben am Diplom stehen sollen, in welcher Reihenfolge">⇅ Regeln Sortierung</button>
+      <button class="btn btn-ghost" onclick="openPrioRulesModal()" title="Welche Treatments oben am Diplom stehen sollen, in welcher Reihenfolge" style="border-color:var(--text);font-weight:600">⇅ Regeln Sortierung</button>
       <button class="btn btn-ghost" onclick="resetTrainingsToDefaults()">Auf Werkseinstellungen zurücksetzen</button>
       <button class="btn btn-ghost" onclick="(async()=>{await promptForGithubToken();renderTrainingsManager();})()" title="Token zum Teilen von Änderungen einrichten">⚿ Token</button>
       <div id="tm-sync-status" style="flex:1;font-size:10px;color:var(--light);text-align:center"></div>
@@ -226,7 +226,7 @@
   </div>
 
   <!-- STEP 2: Config -->
-  <div class="card hidden" id="config-card">
+  <div class="card" id="config-card">
     <div class="card-head"><div class="step">2</div><div class="card-title">Konfiguration</div></div>
     <div class="card-body" style="padding:0">
       <div class="summary-banner">
@@ -266,7 +266,7 @@
   </div>
 
   <!-- STEP 3: Participants -->
-  <div class="card hidden" id="participants-card">
+  <div class="card" id="participants-card">
     <div class="card-head"><div class="step">3</div><div class="card-title">Teilnehmer</div></div>
     <div class="stats-bar">
       <div><span class="sn" id="s-total">0</span> Einträge</div>
@@ -286,12 +286,17 @@
         <span style="font-size:8px;font-weight:400;letter-spacing:.03em;text-transform:none;opacity:.75">einzelne Datei pro Person</span>
       </button>
     </div>
+    <div style="padding:10px 18px;border-bottom:1px solid var(--border);background:var(--bg);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="text" id="manual-name" placeholder="Vor- &amp; Nachname" style="flex:2;min-width:160px;padding:6px 10px;border:1px solid var(--border);border-radius:1px;font-size:11px;background:#fff" onkeydown="if(event.key==='Enter')addManualParticipant()">
+      <input type="text" id="manual-date" placeholder="Datum (TT.MM.JJJJ)" style="flex:1;min-width:110px;padding:6px 10px;border:1px solid var(--border);border-radius:1px;font-size:11px;background:#fff" onkeydown="if(event.key==='Enter')addManualParticipant()">
+      <button class="btn btn-sm btn-p" onclick="addManualParticipant()" style="white-space:nowrap">+ Teilnehmer hinzufügen</button>
+    </div>
     <div><table>
       <thead><tr>
         <th style="width:28px"><input type="checkbox" id="chk-all" onchange="toggleAll(this)" checked></th>
-        <th>Teilnehmer</th><th>E-Mail</th><th style="width:95px">Datum</th>
+        <th>Teilnehmer</th><th>E-Mail</th><th style="width:95px">Datum</th><th style="width:32px"></th>
       </tr></thead>
-      <tbody id="tbl-body"><tr><td colspan="4"><div class="empty">Daten importieren um Teilnehmer anzuzeigen</div></td></tr></tbody>
+      <tbody id="tbl-body"><tr><td colspan="5"><div class="empty">Noch keine Teilnehmer. ERP-Daten oben einfügen oder unten manuell hinzufügen.</div></td></tr></tbody>
     </table></div>
     <div class="prog-area" id="prog">
       <div style="font-size:10px;color:var(--light);font-weight:700;text-transform:uppercase;letter-spacing:.04em" id="prog-lbl"></div>
@@ -795,6 +800,59 @@ function init(){
   ALL_DIPLOMAS.forEach(d=>{
     const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);
   });
+  // Default date = today, formatted DD.MM.YYYY
+  const today=new Date();
+  const dd=String(today.getDate()).padStart(2,'0');
+  const mm=String(today.getMonth()+1).padStart(2,'0');
+  const yyyy=today.getFullYear();
+  const todayStr=dd+'.'+mm+'.'+yyyy;
+  detectedDate=todayStr;
+  const di=document.getElementById('date-input');
+  if(di) di.value=todayStr;
+  // Render config + summary + table once at start so user sees everything
+  try{ renderDynamicConfig(); }catch(e){}
+  try{ updateSummary(); }catch(e){}
+  try{ renderTable(); }catch(e){}
+}
+
+/* ── Manually add a participant (no ERP import needed) ──
+   Reads name + date from the two input fields above the table. Date
+   defaults to whatever's currently in the main date-input field. */
+function addManualParticipant(){
+  const nameEl=document.getElementById('manual-name');
+  const dateEl=document.getElementById('manual-date');
+  const name=(nameEl?.value||'').trim();
+  if(!name){
+    nameEl?.focus();
+    return;
+  }
+  // Date: use user's input if given, else fall back to the configuration date
+  let date=(dateEl?.value||'').trim();
+  if(!date) date=getActiveDate()||'';
+  // Tolerate user typing DD/MM/YYYY — normalize to DD.MM.YYYY for storage
+  date=date.replace(/\//g,'.');
+
+  rows.push({
+    name:name,
+    email:'',
+    date:date,
+    checked:true,
+    excluded:false,
+    manual:true,           // flag so we know it came from this form (allows removal)
+    bez:'',                // not from ERP
+  });
+  // Clear inputs, keep focus for fast multi-entry
+  if(nameEl) nameEl.value='';
+  if(dateEl) dateEl.value='';
+  nameEl?.focus();
+  renderTable();
+}
+
+/* Remove a row by index — used for manually added participants only. */
+function removeParticipant(idx){
+  if(idx<0||idx>=rows.length) return;
+  rows.splice(idx,1);
+  renderTable();
 }
 
 /* ── Config toggles ── */
@@ -1535,11 +1593,17 @@ function addCategory(){
 /* ── Participants table ── */
 function renderTable(){
   const tbody=document.getElementById('tbl-body');
+  if(!tbody) return;
   tbody.innerHTML='';
   document.getElementById('s-total').textContent=rows.length;
   document.getElementById('s-excl').textContent=rows.filter(r=>r.excluded).length;
   document.getElementById('s-sel').textContent=rows.filter(r=>r.checked).length;
   updateGenBtn();
+
+  if(rows.length===0){
+    tbody.innerHTML='<tr><td colspan="5"><div class="empty">Noch keine Teilnehmer. ERP-Daten oben einfügen oder unten manuell hinzufügen.</div></td></tr>';
+    return;
+  }
 
   rows.forEach((r,idx)=>{
     const isTDJ=r.email&&r.email.toLowerCase().endsWith('@teamdrjoseph.com');
@@ -1547,13 +1611,18 @@ function renderTable(){
     if(r.excluded)tr.classList.add('excl');
     const tags=
       (r.excluded?'<span class="badge b-excl">Abgemeldet</span>':'')+
-      (isTDJ?'<span class="badge b-tdj">TEAM DR JOSEPH</span>':'');
+      (isTDJ?'<span class="badge b-tdj">TEAM DR JOSEPH</span>':'')+
+      (r.manual?'<span class="badge" style="background:#eee;color:#555;border:1px solid #ccc">manuell</span>':'');
+    const removeCell = r.manual
+      ? '<td style="text-align:center"><button onclick="removeParticipant('+idx+')" title="Entfernen" style="background:transparent;border:none;color:var(--light);cursor:pointer;font-size:14px;line-height:1;padding:2px 6px">×</button></td>'
+      : '<td></td>';
     tr.innerHTML=
       '<td><input type="checkbox" '+(r.checked?'checked':'')+' onchange="rows['+idx+'].checked=this.checked;onCheckChange()"></td>'+
       '<td><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.82rem">'+esc(r.name)+
         (tags?'<span style="display:flex;gap:4px">'+tags+'</span>':'')+'</div></td>'+
       '<td style="font-size:.72rem;color:var(--light)">'+esc(r.email||'—')+'</td>'+
-      '<td style="font-size:.72rem;color:var(--light);white-space:nowrap">'+esc(fmtDate(r.date))+'</td>';
+      '<td style="font-size:.72rem;color:var(--light);white-space:nowrap">'+esc(fmtDate(r.date))+'</td>'+
+      removeCell;
     tbody.appendChild(tr);
   });
 }
