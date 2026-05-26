@@ -185,7 +185,7 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="openPrioRulesModal()" title="Welche Treatments oben am Diplom stehen sollen, in welcher Reihenfolge">⇅ Regeln Sortierung</button>
       <button class="btn btn-ghost" onclick="resetTrainingsToDefaults()">Auf Werkseinstellungen zurücksetzen</button>
-      <button class="btn btn-ghost" onclick="promptForGithubToken()" title="Token zum Teilen von Änderungen einrichten">⚿ Token</button>
+      <button class="btn btn-ghost" onclick="(async()=>{await promptForGithubToken();renderTrainingsManager();})()" title="Token zum Teilen von Änderungen einrichten">⚿ Token</button>
       <div id="tm-sync-status" style="flex:1;font-size:10px;color:var(--light);text-align:center"></div>
       <button class="btn btn-p" onclick="closeTrainingsManager()">Fertig</button>
     </div>
@@ -507,7 +507,69 @@ function hasGithubToken(){
   return t && t.length > 10;
 }
 
-function promptForGithubToken(){
+/* Validate a GitHub token by making two test API calls:
+   1. GET /user → confirms the token authenticates at all
+   2. GET /repos/{owner}/{repo} → confirms it has access to this specific repo
+   Returns {valid:bool, reason:string, scopes?:string} */
+async function validateGithubToken(token){
+  if(!token || !token.trim()){
+    return {valid:false, reason:'Token ist leer'};
+  }
+  const t = token.trim();
+  // Quick format sanity check
+  if(t.length < 20){
+    return {valid:false, reason:'Token zu kurz — sollte mit "github_pat_" oder "ghp_" beginnen'};
+  }
+
+  // Test 1: authentication
+  try{
+    const userRes = await fetch('https://api.github.com/user', {
+      headers: {
+        'Authorization': 'Bearer '+t,
+        'Accept': 'application/vnd.github+json'
+      }
+    });
+    if(userRes.status === 401){
+      return {valid:false, reason:'Token ist ungültig oder abgelaufen (401 Unauthorized)'};
+    }
+    if(!userRes.ok){
+      return {valid:false, reason:'GitHub gibt Fehler '+userRes.status+' zurück bei Authentifizierung'};
+    }
+  }catch(e){
+    return {valid:false, reason:'Netzwerk-Fehler: '+e.message};
+  }
+
+  // Test 2: repo access
+  try{
+    const repoUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO;
+    const repoRes = await fetch(repoUrl, {
+      headers: {
+        'Authorization': 'Bearer '+t,
+        'Accept': 'application/vnd.github+json'
+      }
+    });
+    if(repoRes.status === 404){
+      return {valid:false, reason:'Token hat keinen Zugriff auf Repo '+GITHUB_OWNER+'/'+GITHUB_REPO+' (404). Prüfe ob das Repository unter "Repository access" ausgewählt ist.'};
+    }
+    if(repoRes.status === 403){
+      return {valid:false, reason:'Token darf nicht auf dieses Repo zugreifen (403 Forbidden). Bei Organization-Repos muss der Org-Admin den Token genehmigen.'};
+    }
+    if(!repoRes.ok){
+      return {valid:false, reason:'GitHub gibt Fehler '+repoRes.status+' bei Repo-Zugriff'};
+    }
+    const repoData = await repoRes.json();
+    // Check if token has push (write) access
+    if(repoData.permissions && repoData.permissions.push === false){
+      return {valid:false, reason:'Token hat nur Lese-Zugriff. Brauche "Contents: Read and write" Permission.'};
+    }
+  }catch(e){
+    return {valid:false, reason:'Netzwerk-Fehler bei Repo-Check: '+e.message};
+  }
+
+  return {valid:true, reason:'Token gültig und hat Schreibzugriff auf '+GITHUB_OWNER+'/'+GITHUB_REPO};
+}
+
+async function promptForGithubToken(){
   const current = getGithubToken();
   const msg = 'GitHub Personal Access Token eingeben:\n\n'+
     'Damit kannst du \u00c4nderungen an der Trainings-Liste mit allen anderen Nutzern teilen.\n\n'+
@@ -515,14 +577,31 @@ function promptForGithubToken(){
     'Leerlassen um Token zu entfernen.';
   const result = window.prompt(msg, current);
   if(result === null) return false; // cancelled
-  setGithubToken(result);
-  if(result && result.trim()){
-    alert('Token gespeichert. \u00c4nderungen werden ab jetzt mit allen Nutzern geteilt.');
-    return true;
-  } else {
+
+  // Empty input → remove token
+  if(!result || !result.trim()){
+    setGithubToken('');
     alert('Token entfernt. \u00c4nderungen werden nur noch lokal gespeichert.');
     return false;
   }
+
+  // Validate before saving
+  _updateSyncStatus('\u21bb Pr\u00fcfe Token bei GitHub\u2026');
+  const validation = await validateGithubToken(result);
+  if(!validation.valid){
+    _updateSyncStatus('');
+    alert('\u2717 Token NICHT gespeichert.\n\n'+validation.reason+'\n\nBitte Token neu erstellen oder Permissions pr\u00fcfen.');
+    return false;
+  }
+
+  // Valid → save and confirm
+  setGithubToken(result);
+  _updateSyncStatus('\u2713 Token g\u00fcltig \u2014 verbunden mit '+GITHUB_OWNER+'/'+GITHUB_REPO);
+  setTimeout(()=>_updateSyncStatus(''), 5000);
+  alert('\u2713 Token g\u00fcltig und gespeichert.\n\n'+validation.reason+'\n\n\u00c4nderungen werden ab jetzt mit allen Nutzern geteilt.');
+  // Refresh trainings from GitHub now that we can authenticate
+  try{ await loadTrainings(); }catch(e){}
+  return true;
 }
 
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/'+GITHUB_BRANCH+'/'+GITHUB_PATH;
@@ -1339,7 +1418,7 @@ function renderTrainingsManager(){
       '<div style="font-weight:700;margin-bottom:6px;font-size:11px">⚠ Bearbeitung gesperrt — kein Token konfiguriert</div>'+
       '<div style="margin-bottom:8px">Trainings-Liste ist im <b>Lesemodus</b>. Um Änderungen vornehmen zu können (für ALLE Nutzer), brauchst du einen GitHub Personal Access Token. '+
       'Frage Johanna nach dem Token, dann klick unten auf <b>"⚿ Token einrichten"</b>.</div>'+
-      '<button class="btn btn-sm btn-p" onclick="promptForGithubToken();renderTrainingsManager()">⚿ Token einrichten</button>'+
+      '<button class="btn btn-sm btn-p" onclick="(async()=>{await promptForGithubToken();renderTrainingsManager();})()">⚿ Token einrichten</button>'+
       '</div>';
   }
 
