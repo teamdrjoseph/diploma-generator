@@ -126,6 +126,25 @@
   /* Quick-Generate treatment chips display */
   .q-treatments-display{min-height:28px;padding:6px;border:1px solid var(--border);border-radius:1px;background:var(--bg);margin-bottom:6px}
   .q-treatments-display .empty{font-size:10px;color:var(--light);font-style:italic;padding:4px}
+
+  /* Prio Rules modal */
+  .prio-section-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--light);margin:0 0 6px 0}
+  .prio-list{display:flex;flex-direction:column;gap:4px;min-height:40px;padding:8px;background:var(--bg);border:1px solid var(--border)}
+  .prio-list.empty-hint{align-items:center;justify-content:center;color:var(--light);font-size:10px;font-style:italic;padding:18px 8px}
+  .prio-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fff;border:1px solid var(--border);cursor:grab;user-select:none}
+  .prio-item.dragging{opacity:.4}
+  .prio-item.drag-over{border-top:2px solid var(--text)}
+  .prio-handle{color:var(--light);font-size:14px;line-height:1;cursor:grab;flex-shrink:0}
+  .prio-num{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;background:var(--text);color:#fff;font-size:9px;font-weight:700;border-radius:50%;flex-shrink:0}
+  .prio-name{flex:1;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prio-cat-badge{font-size:8px;font-weight:700;color:var(--light);letter-spacing:.06em;padding:2px 5px;border:1px solid var(--border);text-transform:uppercase}
+  .prio-remove{background:transparent;border:none;color:var(--light);cursor:pointer;font-size:14px;padding:0 4px;line-height:1}
+  .prio-remove:hover{color:#c00}
+  .prio-add-row{display:flex;gap:6px;align-items:center}
+  .prio-add-select{flex:1;padding:6px 8px;font-size:11px;border:1px solid var(--border);background:#fff}
+  .prio-add-btn{padding:6px 12px;font-size:11px;background:var(--text);color:#fff;border:1px solid var(--text);cursor:pointer}
+  .prio-add-btn:hover{background:#1a1a1a}
+  .prio-add-btn:disabled{opacity:.4;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -164,10 +183,29 @@
     </div>
     <div class="modal-body" id="trainings-manager-body"></div>
     <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="openPrioRulesModal()" title="Welche Treatments oben am Diplom stehen sollen, in welcher Reihenfolge">⇅ Regeln Sortierung</button>
       <button class="btn btn-ghost" onclick="resetTrainingsToDefaults()">Auf Werkseinstellungen zurücksetzen</button>
       <button class="btn btn-ghost" onclick="promptForGithubToken()" title="Token zum Teilen von Änderungen einrichten">⚿ Token</button>
       <div id="tm-sync-status" style="flex:1;font-size:10px;color:var(--light);text-align:center"></div>
       <button class="btn btn-p" onclick="closeTrainingsManager()">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRIO RULES MODAL -->
+<div class="modal-overlay hidden" id="prio-rules-modal" onclick="if(event.target===this)closePrioRulesModal()">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <div class="modal-title">Regeln Sortierung — Prio-Treatments</div>
+      <button class="modal-close" onclick="closePrioRulesModal()">×</button>
+    </div>
+    <div class="modal-body" id="prio-rules-body" style="display:flex;flex-direction:column;gap:14px"></div>
+    <div class="modal-footer">
+      <div style="flex:1;font-size:11px;color:var(--light);line-height:1.4">
+        Diese Treatments erscheinen <b>oben am Diplom</b> in genau dieser Reihenfolge.<br>
+        Alles andere wird automatisch danach einsortiert (FACE aufsteigend, BODY absteigend).
+      </div>
+      <button class="btn btn-p" onclick="closePrioRulesModal()">Fertig</button>
     </div>
   </div>
 </div>
@@ -410,7 +448,36 @@ const TRAININGS_DEFAULTS=[
 ];
 
 let trainingsList = []; // populated from localStorage or defaults at init
+let prioTreatments = []; // ordered list of treatment names that get priority on diplomas (see sort-rules modal)
 const TRAININGS_STORAGE_KEY = 'tdj_trainings_v1';
+const PRIO_STORAGE_KEY = 'tdj_prio_treatments_v1';
+
+/* Sensible defaults for the priority list — these are the academy-required
+   top-of-diploma treatments. User can edit via "Regeln Sortierung" modal. */
+const PRIO_DEFAULTS = [
+  "SIGNATURE TREATMENT TRAININGS FACE",
+  "SUPREME EYE + FACE LIFT TREATMENT",
+  "REJUVENATING FACE TREATMENT",
+  "HOLISTIC FACE + BODY RITUAL"
+];
+
+/* Encoding of prioTreatments into the trainings array for GitHub-sync:
+   we append a marker entry { __prio:true, items:[...] } so the existing JSON
+   array format stays intact and any reader sees it as a no-op pseudo-category. */
+function _splitPrioFromList(combined){
+  const out = {list:[], prio:[]};
+  for(const entry of combined){
+    if(entry && entry.__prio === true){
+      out.prio = Array.isArray(entry.items) ? entry.items.slice() : [];
+    } else {
+      out.list.push(entry);
+    }
+  }
+  return out;
+}
+function _joinPrioToList(list, prio){
+  return [...list, {__prio:true, items: prio.slice()}];
+}
 
 /* GitHub-backed shared trainings list.
    - Anyone can READ via the public raw URL (no token needed since repo is public)
@@ -472,13 +539,26 @@ async function loadTrainings(){
     if(stored){
       const parsed = JSON.parse(stored);
       if(Array.isArray(parsed) && parsed.length > 0){
-        trainingsList = parsed;
+        const split = _splitPrioFromList(parsed);
+        trainingsList = split.list;
+        prioTreatments = split.prio;
         seeded = true;
       }
     }
   }catch(e){}
   if(!seeded){
     trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
+  }
+  // Also try to load prio from its own localStorage key (independent of trainings sync)
+  try{
+    const prioStored = localStorage.getItem(PRIO_STORAGE_KEY);
+    if(prioStored){
+      const parsedPrio = JSON.parse(prioStored);
+      if(Array.isArray(parsedPrio)) prioTreatments = parsedPrio;
+    }
+  }catch(e){}
+  if(!prioTreatments || prioTreatments.length === 0){
+    prioTreatments = PRIO_DEFAULTS.slice();
   }
 
   // 2) Try to fetch latest from GitHub. Public repo → use raw URL (no token).
@@ -500,8 +580,14 @@ async function loadTrainings(){
     const content = atob(data.content.replace(/\s/g,''));
     const remoteList = JSON.parse(content);
     if(Array.isArray(remoteList) && remoteList.length > 0){
-      trainingsList = remoteList;
-      try{ localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(trainingsList)); }catch(e){}
+      const split = _splitPrioFromList(remoteList);
+      trainingsList = split.list;
+      // Only overwrite prio from remote if remote has one set
+      if(split.prio.length > 0) prioTreatments = split.prio;
+      try{
+        localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(remoteList));
+        localStorage.setItem(PRIO_STORAGE_KEY, JSON.stringify(prioTreatments));
+      }catch(e){}
       // Re-render manager if open
       const mgrModal = document.getElementById('trainings-modal');
       if(mgrModal && !mgrModal.classList.contains('hidden')) renderTrainingsManager();
@@ -512,9 +598,12 @@ async function loadTrainings(){
 }
 
 async function saveTrainings(){
+  // Combine the two pieces into one array for storage
+  const combined = _joinPrioToList(trainingsList, prioTreatments);
   // Always write to localStorage immediately (fast feedback, works offline)
   try{
-    localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(trainingsList));
+    localStorage.setItem(TRAININGS_STORAGE_KEY, JSON.stringify(combined));
+    localStorage.setItem(PRIO_STORAGE_KEY, JSON.stringify(prioTreatments));
   }catch(e){console.warn('localStorage save failed', e);}
 
   // Only push to GitHub if a token is configured. Otherwise: local-only mode.
@@ -536,7 +625,8 @@ async function _pushTrainingsToGithub(){
   }
   _updateSyncStatus('↻ Speichere…');
   try{
-    const content = JSON.stringify(trainingsList, null, 2);
+    const combined = _joinPrioToList(trainingsList, prioTreatments);
+    const content = JSON.stringify(combined, null, 2);
     const utf8Bytes = new TextEncoder().encode(content);
     let binary = '';
     utf8Bytes.forEach(b => binary += String.fromCharCode(b));
@@ -589,6 +679,7 @@ function resetTrainingsToDefaults(){
   }
   if(!confirm('Liste auf Werkseinstellungen zurücksetzen? Alle eigenen Änderungen gehen verloren — und werden auch für andere Nutzer überschrieben falls du einen Token hast.'))return;
   trainingsList = TRAININGS_DEFAULTS.map(c => ({...c, items: [...c.items]}));
+  prioTreatments = PRIO_DEFAULTS.slice();
   saveTrainings();
   renderTrainingsManager();
 }
@@ -1067,6 +1158,173 @@ function closeTrainingsManager(){
   document.getElementById('trainings-modal').classList.add('hidden');
 }
 
+/* ── Prio Rules Modal ─────────────────────────────────────────────────────
+   Manages the prioTreatments list. User can:
+   - Add treatments from any category via dropdown
+   - Reorder via drag-and-drop (HTML5 drag API, also up/down buttons as fallback)
+   - Remove a treatment from the prio list
+   The order in this list becomes the "academy order" at the top of every diploma.
+*/
+
+function openPrioRulesModal(){
+  document.getElementById('prio-rules-modal').classList.remove('hidden');
+  renderPrioRulesModal();
+}
+function closePrioRulesModal(){
+  document.getElementById('prio-rules-modal').classList.add('hidden');
+}
+
+function _findCategoryFor(treatmentName){
+  if(!treatmentName) return '';
+  const u = treatmentName.trim().toUpperCase();
+  for(const cat of trainingsList){
+    for(const it of (cat.items||[])){
+      if((it||'').trim().toUpperCase() === u) return cat.cat || '';
+    }
+  }
+  return '';
+}
+
+function renderPrioRulesModal(){
+  const el = document.getElementById('prio-rules-body');
+  if(!el) return;
+  const canEdit = hasGithubToken();
+
+  let html = '';
+  if(!canEdit){
+    html += '<div class="tm-info tm-info-warn" style="margin:0 0 4px 0">'+
+      '<div style="font-weight:700;margin-bottom:4px;font-size:11px">⚠ Lesemodus — Token erforderlich</div>'+
+      '<div>Ohne Token kannst du die Sortier-Regeln anschauen, aber nicht ändern.</div>'+
+      '</div>';
+  }
+
+  // Current prio list
+  html += '<div>';
+  html += '<div class="prio-section-title">Prio-Treatments (Reihenfolge oben am Diplom)</div>';
+  if(prioTreatments.length === 0){
+    html += '<div class="prio-list empty-hint">Noch keine Prio-Treatments definiert. Füge unten welche hinzu ↓</div>';
+  } else {
+    html += '<div class="prio-list" id="prio-list-dnd">';
+    for(let i=0; i<prioTreatments.length; i++){
+      const name = prioTreatments[i];
+      const cat = _findCategoryFor(name);
+      const draggable = canEdit ? 'draggable="true"' : '';
+      html += '<div class="prio-item" '+draggable+' data-idx="'+i+'"'+
+        (canEdit ? ' ondragstart="prioDragStart(event,'+i+')" ondragover="prioDragOver(event,'+i+')" ondragleave="prioDragLeave(event)" ondrop="prioDrop(event,'+i+')" ondragend="prioDragEnd(event)"' : '')+
+        '>';
+      html += '<span class="prio-handle" title="Ziehen zum Verschieben">⋮⋮</span>';
+      html += '<span class="prio-num">'+(i+1)+'</span>';
+      html += '<span class="prio-name" title="'+_escapeHtml(name)+'">'+_escapeHtml(name)+'</span>';
+      if(cat) html += '<span class="prio-cat-badge" title="Kategorie">'+_escapeHtml(cat)+'</span>';
+      if(canEdit) html += '<button class="prio-remove" onclick="removeFromPrio('+i+')" title="Entfernen">×</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Add row
+  if(canEdit){
+    // Build options from all training items, excluding ones already in prio list
+    const prioSet = new Set(prioTreatments.map(t => t.trim().toUpperCase()));
+    const options = [];
+    for(const cat of trainingsList){
+      const items = cat.items || [];
+      const filtered = items.filter(it => it && !prioSet.has(it.trim().toUpperCase()));
+      if(filtered.length === 0) continue;
+      options.push({type:'group', label: cat.cat || '?'});
+      for(const it of filtered){ options.push({type:'item', value: it}); }
+    }
+    html += '<div>';
+    html += '<div class="prio-section-title">Treatment hinzufügen</div>';
+    html += '<div class="prio-add-row">';
+    html += '<select class="prio-add-select" id="prio-add-select">';
+    if(options.length === 0){
+      html += '<option value="">— Alle Treatments sind bereits in der Prio-Liste —</option>';
+    } else {
+      html += '<option value="">— Treatment auswählen —</option>';
+      for(const opt of options){
+        if(opt.type === 'group'){
+          html += '<optgroup label="'+_escapeHtml(opt.label)+'">';
+        } else {
+          html += '<option value="'+_escapeHtml(opt.value)+'">'+_escapeHtml(opt.value)+'</option>';
+        }
+      }
+    }
+    html += '</select>';
+    html += '<button class="prio-add-btn" onclick="addFromPrioSelect()"'+(options.length===0?' disabled':'')+'>+ Hinzufügen</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function _escapeHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function addFromPrioSelect(){
+  const sel = document.getElementById('prio-add-select');
+  if(!sel) return;
+  const val = sel.value;
+  if(!val) return;
+  // Don't add duplicates
+  const upper = val.trim().toUpperCase();
+  if(prioTreatments.some(t => (t||'').trim().toUpperCase() === upper)) return;
+  prioTreatments.push(val);
+  saveTrainings();
+  renderPrioRulesModal();
+}
+
+function removeFromPrio(idx){
+  if(idx < 0 || idx >= prioTreatments.length) return;
+  prioTreatments.splice(idx, 1);
+  saveTrainings();
+  renderPrioRulesModal();
+}
+
+/* Drag & drop reordering — uses HTML5 drag API. Stores source index in
+   a module-level variable so we can rearrange on drop. */
+let _prioDragSrc = -1;
+function prioDragStart(e, idx){
+  _prioDragSrc = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  // Some browsers need data set to start drag
+  try{ e.dataTransfer.setData('text/plain', String(idx)); }catch(err){}
+  if(e.target && e.target.classList) e.target.classList.add('dragging');
+}
+function prioDragOver(e, idx){
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const el = e.currentTarget;
+  if(el && el.classList && _prioDragSrc !== idx) el.classList.add('drag-over');
+}
+function prioDragLeave(e){
+  const el = e.currentTarget;
+  if(el && el.classList) el.classList.remove('drag-over');
+}
+function prioDrop(e, idx){
+  e.preventDefault();
+  const el = e.currentTarget;
+  if(el && el.classList) el.classList.remove('drag-over');
+  if(_prioDragSrc < 0 || _prioDragSrc === idx) return;
+  // Move item from _prioDragSrc to idx
+  const moved = prioTreatments.splice(_prioDragSrc, 1)[0];
+  // If we removed an item before the target, the target index shifts down by 1
+  const targetIdx = (_prioDragSrc < idx) ? idx - 1 : idx;
+  prioTreatments.splice(targetIdx, 0, moved);
+  _prioDragSrc = -1;
+  saveTrainings();
+  renderPrioRulesModal();
+}
+function prioDragEnd(e){
+  if(e.target && e.target.classList) e.target.classList.remove('dragging');
+  // Clean up any leftover drag-over on all items
+  document.querySelectorAll('.prio-item.drag-over').forEach(n => n.classList.remove('drag-over'));
+  _prioDragSrc = -1;
+}
+
 function renderTrainingsManager(){
   const el = document.getElementById('trainings-manager-body');
   if(!el) return;
@@ -1395,33 +1653,122 @@ function _packLines(items){
   return lines.map(l=>l.text);
 }
 
-/* Returns null if can't fit, else {slots: array of length maxSlots, linesUsed} */
+/* ── Academy treatment classification ──
+   Sorting rules (configured by user in "Regeln Sortierung" modal):
+     1. Prio treatments (in user-defined order, from prioTreatments list)
+     2. All FACE-category items (ascending by length → top of diamond)
+     3. All BODY-category items (descending by length → bottom of diamond)
+     4. Everything else (other categories, in input order)
+   Treatments are classified by membership in the FACE / BODY categories
+   of trainingsList — those are the two fixed categories the academy cares
+   about. Items in any other category (DEMO, TRAIN THE TRAINER, etc.) are
+   considered "unclassified" and go at the very end.
+*/
+
+/* Returns 'FACE' | 'BODY' | null based on which category the treatment
+   appears in. Case-insensitive match against the trainingsList contents. */
+function _classifyTreatmentByCategory(treatment){
+  if(!treatment) return null;
+  const upper = treatment.trim().toUpperCase();
+  for(const cat of trainingsList){
+    const catName = (cat.cat || '').toUpperCase();
+    if(catName !== 'FACE' && catName !== 'BODY') continue;
+    const items = cat.items || [];
+    for(const it of items){
+      if((it || '').trim().toUpperCase() === upper) return catName;
+    }
+  }
+  return null;
+}
+
+/* Returns the priority index (0-based) if treatment is in the prio list,
+   else -1. Case-insensitive match. */
+function _prioIndex(treatment){
+  if(!treatment) return -1;
+  const upper = treatment.trim().toUpperCase();
+  for(let i=0; i<prioTreatments.length; i++){
+    if((prioTreatments[i] || '').trim().toUpperCase() === upper) return i;
+  }
+  return -1;
+}
+
+/* Tag every item with its group: 'prio' | 'face' | 'body' | 'other'.
+   For prio, also tag with prio-order so we can sort by user's drag order. */
+function _tagItem(treatment){
+  const pi = _prioIndex(treatment);
+  if(pi >= 0) return {item:treatment, group:'prio', prioOrder:pi};
+  const cls = _classifyTreatmentByCategory(treatment);
+  if(cls === 'FACE') return {item:treatment, group:'face'};
+  if(cls === 'BODY') return {item:treatment, group:'body'};
+  return {item:treatment, group:'other'};
+}
+
+/* Order items per academy rules, returns reordered array.
+   Prio: by user-defined order in prioTreatments list.
+   Face: ascending length. Body: descending length. Other: input order. */
+function _orderForAcademy(items){
+  const tagged = items.map(_tagItem);
+  const prio = tagged.filter(t=>t.group==='prio').sort((a,b)=>a.prioOrder-b.prioOrder).map(t=>t.item);
+  const face = tagged.filter(t=>t.group==='face').map(t=>t.item).sort((a,b)=>a.length-b.length);
+  const body = tagged.filter(t=>t.group==='body').map(t=>t.item).sort((a,b)=>b.length-a.length);
+  const other = tagged.filter(t=>t.group==='other').map(t=>t.item);
+  return [...prio, ...face, ...body, ...other];
+}
+
+/* Returns the group label for a given treatment — used for in-group pairing
+   and for multi-page block-grouping. */
+function _groupOf(treatment){
+  return _tagItem(treatment).group;
+}
+
+/* Pair adjacent items in an ordered list when both fit in MAX_LINE_CHARS.
+   Greedy left-to-right: keeps reading order intact, only pairs when the
+   combined line still fits. Items from different groups are NEVER paired
+   together (e.g. last prio item won't pair with first face item). */
+function _pairAdjacent(orderedItems){
+  const lines = [];
+  let i = 0;
+  while(i < orderedItems.length){
+    const a = orderedItems[i];
+    const b = orderedItems[i+1];
+    const sameGroup = b !== undefined && _groupOf(a) === _groupOf(b);
+    if(sameGroup && (a.length + 3 + b.length) <= MAX_LINE_CHARS){
+      lines.push(a + ' / ' + b);
+      i += 2;
+    } else {
+      lines.push(a);
+      i += 1;
+    }
+  }
+  return lines;
+}
+
+/* Returns null if can't fit, else {slots: array of length maxSlots, linesUsed}.
+   New academy-order behavior: items are reordered per _orderForAcademy,
+   then placed top-down (no diamond center-out). Empty slots go to the bottom
+   so the content reads naturally from the top. */
 function distributeTreatmentsTry(items, maxSlots){
   if(!items.length) return {slots:new Array(maxSlots).fill(''), linesUsed:0};
-  const n=items.length;
 
-  // ≤5 items: preserve "all singles" preference for clean look
-  // >5 items: pack greedily to minimize line count
+  // Apply academy ordering first
+  const ordered = _orderForAcademy(items);
+  const n = ordered.length;
+
+  // If all items fit as single lines, keep them single (cleaner look)
+  // Otherwise, try greedy adjacent pairing (preserves order)
   let lines;
-  if(n<=5){
-    // First try all singles
-    if(n<=maxSlots){
-      lines=[...items];
-    } else {
-      lines=_packLines(items);
-    }
+  if(n <= maxSlots){
+    lines = [...ordered];
   } else {
-    lines=_packLines(items);
+    lines = _pairAdjacent(ordered);
   }
 
-  if(lines.length>maxSlots) return null;
+  if(lines.length > maxSlots) return null;
 
-  const arranged=_arrangeDiamond(lines);
-  const result=new Array(maxSlots).fill('');
-  const empty=maxSlots-arranged.length;
-  const emptyTop=Math.floor(empty/2);
-  for(let i=0;i<arranged.length;i++) result[emptyTop+i]=arranged[i];
-  return {slots:result, linesUsed:arranged.length};
+  // Place top-down, empty slots at the bottom
+  const result = new Array(maxSlots).fill('');
+  for(let i=0; i<lines.length; i++) result[i] = lines[i];
+  return {slots:result, linesUsed:lines.length};
 }
 
 /* Legacy entrypoint: returns just the slots array (compat with existing callers).
@@ -1435,45 +1782,110 @@ function distributeTreatments(list,n){
   return slots;
 }
 
+/* Split ordered items into contiguous blocks by group, in this fixed order:
+   prio → face → body → other. Each block keeps its internal ordering
+   (which was already set by _orderForAcademy). */
+function _blocksFromOrdered(orderedItems){
+  const blocks = [];
+  let current = null;
+  for(const it of orderedItems){
+    const g = _groupOf(it);
+    if(!current || current.group !== g){
+      current = {group:g, items:[]};
+      blocks.push(current);
+    }
+    current.items.push(it);
+  }
+  return blocks;
+}
+
+/* Try to fit a set of items on one page. Returns page result or null if
+   too many lines for maxSlots. */
+function _tryFitOnePage(items, maxSlots){
+  if(!items.length) return {slots:new Array(maxSlots).fill(''), linesUsed:0};
+  const lines = (items.length <= maxSlots) ? items.slice() : _pairAdjacent(items);
+  if(lines.length > maxSlots) return null;
+  const result = new Array(maxSlots).fill('');
+  for(let i=0;i<lines.length;i++) result[i] = lines[i];
+  return {slots:result, linesUsed:lines.length};
+}
+
+/* Smart block-aware multi-page distribution.
+   - Items are already in academy order via _orderForAcademy
+   - Split into blocks by group (prio/face/body/other)
+   - Greedy: accumulate blocks into the current page as long as they fit;
+     start a new page when adding the next block would overflow
+   - If a single block is bigger than maxSlots → split it across pages
+     respecting its internal length-sort */
+function _smartMultiPage(orderedItems, maxSlots){
+  const blocks = _blocksFromOrdered(orderedItems);
+  const pages = [];
+  let currentItems = [];
+
+  function flushPage(){
+    if(!currentItems.length) return;
+    const result = _tryFitOnePage(currentItems, maxSlots);
+    if(result){
+      pages.push(result);
+    } else {
+      // Pair-pack and still too many lines → split this batch into chunks of maxSlots
+      // (rare, only when a single block is bigger than fits-with-pairs)
+      let idx = 0;
+      while(idx < currentItems.length){
+        const chunk = currentItems.slice(idx, idx + maxSlots);
+        const chunkResult = _tryFitOnePage(chunk, maxSlots) || (function(){
+          const slots = new Array(maxSlots).fill('');
+          for(let i=0;i<chunk.length;i++) slots[i] = chunk[i];
+          return {slots, linesUsed:chunk.length};
+        })();
+        pages.push(chunkResult);
+        idx += maxSlots;
+      }
+    }
+    currentItems = [];
+  }
+
+  for(const block of blocks){
+    // Can we add this entire block to the current page?
+    const candidate = currentItems.concat(block.items);
+    const fit = _tryFitOnePage(candidate, maxSlots);
+    if(fit){
+      currentItems = candidate;
+    } else {
+      // Block doesn't fit on current page. Flush current, then try block alone.
+      flushPage();
+      const blockAlone = _tryFitOnePage(block.items, maxSlots);
+      if(blockAlone){
+        currentItems = block.items.slice();
+      } else {
+        // Block alone is too big — needs splitting across multiple pages.
+        // Try to use as many full pages as needed.
+        currentItems = block.items.slice();
+        flushPage(); // splits into chunks of maxSlots
+      }
+    }
+  }
+  flushPage();
+
+  return pages.length ? pages : [{slots:new Array(maxSlots).fill(''), linesUsed:0}];
+}
+
 /* Multi-page distribution. Returns array of pages, each {slots, linesUsed}.
+   - Reorders items per academy rules first
    - If all fit on one page → returns 1 page
-   - Else: splits evenly across N pages, each with its own diamond layout
-   - Each page gets the same name/date/hotel header (handled by caller) */
+   - Otherwise: block-aware multi-page (keep groups together when possible) */
 function distributeMultiPage(items, maxSlots){
   if(!items.length) return [{slots:new Array(maxSlots).fill(''), linesUsed:0}];
 
+  // Always reorder per academy rules first
+  const ordered = _orderForAcademy(items);
+
   // Try single page first
-  const single=distributeTreatmentsTry(items, maxSlots);
+  const single = _tryFitOnePage(ordered, maxSlots);
   if(single) return [single];
 
-  // Need multiple pages. Try N=2,3,...10 pages with even distribution.
-  for(let nPages=2; nPages<=10; nPages++){
-    const itemsPerPage=Math.ceil(items.length/nPages);
-    const pages=[];
-    let ok=true;
-    for(let p=0; p<nPages; p++){
-      const start=p*itemsPerPage;
-      if(start>=items.length) break;
-      const end=Math.min(start+itemsPerPage, items.length);
-      const pageItems=items.slice(start, end);
-      const pageResult=distributeTreatmentsTry(pageItems, maxSlots);
-      if(!pageResult){ ok=false; break; }
-      pages.push(pageResult);
-    }
-    if(ok) return pages;
-  }
-
-  // Hard fallback: 1 item per slot, chunked
-  const fallbackPages=[];
-  let idx=0;
-  while(idx<items.length){
-    const pageItems=items.slice(idx, idx+maxSlots);
-    const pageSlots=new Array(maxSlots).fill('');
-    for(let i=0;i<pageItems.length;i++) pageSlots[i]=pageItems[i];
-    fallbackPages.push({slots:pageSlots, linesUsed:pageItems.length});
-    idx+=maxSlots;
-  }
-  return fallbackPages;
+  // Multi-page: block-aware smart distribution
+  return _smartMultiPage(ordered, maxSlots);
 }
 
 /* Decode a PDFString or PDFHexString to a plain JS string (handles UTF-16 BE) */
