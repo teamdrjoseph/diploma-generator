@@ -152,7 +152,7 @@
 <header>
   <div style="display:flex;align-items:center;gap:12px">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2171.39 178.81" style="height:18px;width:auto"><g><path d="M2135.2,72.14V2.87h36.19V175.93H2135.2V98.75h-41.46v77.18h-36.19V2.87h36.19V72.14Z"/><path d="M1875.39,2.87h65.18c33.08,0,46,20.14,46,51.76,0,19.67-5.76,50.82-48.2,50.82h-26.83v70.48h-36.18Zm36.18,76h20.13c10.78,0,18.23-11.75,18.23-23.25,0-14.15-3.86-26.12-20.14-26.12h-18.22Z"/><path d="M1707.36,175.93V2.87h94.42V29.48h-58.23V72.14h53.7V98.75h-53.7v50.57h60.17v26.61Z"/><path d="M1573.13,178.81c-44.83,0-53.21-26.39-51.3-56.32H1558c0,16.54.75,30.42,20.62,30.42,12.24,0,18.23-7.89,18.23-19.64,0-31.18-72.86-33.09-72.86-84.62C1524,21.57,1537,0,1581,0c35.25,0,52.72,15.82,50.33,52h-35.21c0-12.94-2.17-26.13-16.8-26.13-11.76,0-18.68,6.47-18.68,18.45,0,32.84,72.86,30,72.86,84.37C1633.53,173.53,1600.71,178.81,1573.13,178.81Z"/><path d="M1330.12,89.4c0-45.78,0-89.4,59.65-89.4s59.69,43.62,59.69,89.4c0,45.29,0,89.41-59.69,89.41S1330.12,134.69,1330.12,89.4Zm82.66,0c0-44.34-2.65-63.52-23-63.52s-23,19.18-23,63.52,2.62,63.51,23,63.51S1412.78,133.75,1412.78,89.4Z"/><path d="M1255.31,2.87V135.66c0,30.2-24.43,43.15-50.1,43.15-50.56,0-52.73-21.11-52.73-60.42h36.94c0,13.9-3.11,34.52,15.79,34.52,8.15,0,13.92-7.45,13.92-14.85V2.87Z"/><path d="M1036.65,88.61h-17.92V2.87h33.12c12.22,0,20.07,7.84,20.07,22.45,0,10.92-4.27,19.12-15.91,21v.24c3.9.48,15.56,1.43,15.56,16.86,0,5.45.35,21.62,2,25.17H1056c-2.37-5.23-1.91-11-1.91-16.62,0-10.22,1-18.89-12.83-18.89h-4.62Zm0-48.69h7.95c7.14,0,9.16-7.12,9.16-12.58,0-8.2-3.46-11.28-9.16-11.28h-7.95Z"/><path d="M873.87,2.87h60.4c47.45,0,56.31,31.65,56.31,85.57,0,26.59,4.09,87.49-57.76,87.49h-59Zm36.19,146.45h17.49c22.06,0,26.35-16.54,26.35-59.92,0-31.88,0-59.92-25.14-59.92h-18.7Z"/><path d="M542.88,175.93V2.87h58.23l27.08,117.67h.48L657.43,2.87h56.32V175.93H678.52V42.43H678l-33.31,133.5H610.22L578.59,42.43h-.49v133.5Z"/><path d="M336,175.93,384,2.87h47.69l47,173.06H440.52l-9.58-38.36H381.57l-9.83,34.36Zm69.77-139.74h-.48L388.76,111h34.51Z"/><path d="M181.45,175.93V2.87h94.42V29.48H217.63V72.14h53.69V98.75H217.63v50.57h60.16v26.61Z"/><path d="M116.72,2.87V31.64H76.45V175.93H40.27V31.64H0V2.87Z"/></g></svg>
-    <span class="v-badge">v3</span>
+    <span class="v-badge">v4</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <button class="btn" onclick="openQuick()">⚡ Schnellgenerierung</button>
@@ -1894,34 +1894,49 @@ function _tagItem(treatment){
 
 /* Order items per academy rules, returns reordered array.
    Prio: by user-defined order in prioTreatments list.
-   Face: ascending length. Body: descending length. Other: input order. */
-function _orderForAcademy(items){
-  const tagged = items.map(_tagItem);
-  const prio = tagged.filter(t=>t.group==='prio').sort((a,b)=>a.prioOrder-b.prioOrder).map(t=>t.item);
-  const face = tagged.filter(t=>t.group==='face').map(t=>t.item).sort((a,b)=>a.length-b.length);
-  const body = tagged.filter(t=>t.group==='body').map(t=>t.item).sort((a,b)=>b.length-a.length);
-  const other = tagged.filter(t=>t.group==='other').map(t=>t.item);
-  return [...prio, ...face, ...body, ...other];
-}
+   Face: ascending length. Body: descending length. Other: input order.
+   See _buildAcademyLines below for the full implementation; this is kept
+   as a forward declaration but the real definition follows after. */
 
-/* Returns the group label for a given treatment — used for in-group pairing
-   and for multi-page block-grouping. */
-function _groupOf(treatment){
-  return _tagItem(treatment).group;
-}
-
-/* Pair adjacent items in an ordered list when both fit in MAX_LINE_CHARS.
-   Greedy left-to-right: keeps reading order intact, only pairs when the
-   combined line still fits. Items from different groups are NEVER paired
-   together (e.g. last prio item won't pair with first face item). */
-function _pairAdjacent(orderedItems){
+/* Pair items WITHIN a single group's items only. Greedy with sorted input:
+   for face we want pairs+singles re-sortable ascending, for body descending.
+   Returns array of line strings (each line = 1 or 2 items). */
+function _pairWithinGroup(items, sortDirection){
+  if(!items.length) return [];
+  // Sort by length first so pairing decisions are stable per group:
+  // short→long for face, long→short for body. The direction doesn't matter
+  // for the pair decisions since we re-sort lines at the end anyway.
+  const sorted = [...items].sort((a,b) => sortDirection === 'asc' ? a.length-b.length : b.length-a.length);
   const lines = [];
   let i = 0;
-  while(i < orderedItems.length){
-    const a = orderedItems[i];
-    const b = orderedItems[i+1];
-    const sameGroup = b !== undefined && _groupOf(a) === _groupOf(b);
-    if(sameGroup && (a.length + 3 + b.length) <= MAX_LINE_CHARS){
+  while(i < sorted.length){
+    const a = sorted[i];
+    const b = sorted[i+1];
+    if(b !== undefined && (a.length + 3 + b.length) <= MAX_LINE_CHARS){
+      lines.push(a + ' / ' + b);
+      i += 2;
+    } else {
+      lines.push(a);
+      i += 1;
+    }
+  }
+  // Re-sort the produced lines by final line length so visual order is clean:
+  // asc → short lines at top (face), desc → long lines at top (body)
+  lines.sort((a,b) => sortDirection === 'asc' ? a.length-b.length : b.length-a.length);
+  return lines;
+}
+
+/* Pair PRIO items in their user-defined order (no length sorting, no
+   re-sorting of result). Pairs consecutive items if they fit; otherwise
+   keeps them as singles. Reading order is preserved. */
+function _pairPrioInOrder(items){
+  if(!items.length) return [];
+  const lines = [];
+  let i = 0;
+  while(i < items.length){
+    const a = items[i];
+    const b = items[i+1];
+    if(b !== undefined && (a.length + 3 + b.length) <= MAX_LINE_CHARS){
       lines.push(a + ' / ' + b);
       i += 2;
     } else {
@@ -1932,26 +1947,67 @@ function _pairAdjacent(orderedItems){
   return lines;
 }
 
+/* Build the full line list per academy rules.
+   Pairing modes:
+     'none'   → all items as singles (1 line each)
+     'overflow' → pair Face/Body/Other only (Prio kept single)
+     'full'   → pair everything including Prio (last resort) */
+function _buildAcademyLines(items, pairMode){
+  const tagged = items.map(_tagItem);
+  const prio = tagged.filter(t=>t.group==='prio').sort((a,b)=>a.prioOrder-b.prioOrder).map(t=>t.item);
+  const face = tagged.filter(t=>t.group==='face').map(t=>t.item);
+  const body = tagged.filter(t=>t.group==='body').map(t=>t.item);
+  const other = tagged.filter(t=>t.group==='other').map(t=>t.item);
+
+  if(pairMode === 'none'){
+    // All singles, only length-sort face/body
+    return [
+      ...prio,
+      ...face.sort((a,b)=>a.length-b.length),
+      ...body.sort((a,b)=>b.length-a.length),
+      ...other
+    ];
+  }
+
+  // Pair within Face/Body/Other
+  const faceLines = _pairWithinGroup(face, 'asc');
+  const bodyLines = _pairWithinGroup(body, 'desc');
+  const otherLines = _pairWithinGroup(other, 'asc');
+
+  if(pairMode === 'full'){
+    // Also pair Prio (preserves user-defined order)
+    return [..._pairPrioInOrder(prio), ...faceLines, ...bodyLines, ...otherLines];
+  }
+  // 'overflow' — keep Prio singles
+  return [...prio, ...faceLines, ...bodyLines, ...otherLines];
+}
+
+/* Legacy: still called by some code paths. Returns items in academy order
+   without any pairing (used for grouping into pages). */
+function _orderForAcademy(items){
+  return _buildAcademyLines(items, 'none');
+}
+
+/* Returns the group label for a given treatment. */
+function _groupOf(treatment){
+  return _tagItem(treatment).group;
+}
+
 /* Returns null if can't fit, else {slots: array of length maxSlots, linesUsed}.
-   New academy-order behavior: items are reordered per _orderForAcademy,
-   then placed top-down (no diamond center-out). Empty slots go to the bottom
-   so the content reads naturally from the top. */
+   Tries progressively more aggressive packing:
+     1. All singles (cleanest look)
+     2. Pair Face/Body/Other but keep Prio singles
+     3. Pair everything including Prio (last resort before giving up) */
 function distributeTreatmentsTry(items, maxSlots){
   if(!items.length) return {slots:new Array(maxSlots).fill(''), linesUsed:0};
 
-  // Apply academy ordering first
-  const ordered = _orderForAcademy(items);
-  const n = ordered.length;
-
-  // If all items fit as single lines, keep them single (cleaner look)
-  // Otherwise, try greedy adjacent pairing (preserves order)
-  let lines;
-  if(n <= maxSlots){
-    lines = [...ordered];
-  } else {
-    lines = _pairAdjacent(ordered);
+  let lines = _buildAcademyLines(items, 'none');
+  if(lines.length > maxSlots){
+    lines = _buildAcademyLines(items, 'overflow');
   }
-
+  if(lines.length > maxSlots){
+    lines = _buildAcademyLines(items, 'full');
+  }
   if(lines.length > maxSlots) return null;
 
   // Place top-down, empty slots at the bottom
@@ -1989,10 +2045,12 @@ function _blocksFromOrdered(orderedItems){
 }
 
 /* Try to fit a set of items on one page. Returns page result or null if
-   too many lines for maxSlots. */
+   too many lines for maxSlots. Tries progressive packing modes. */
 function _tryFitOnePage(items, maxSlots){
   if(!items.length) return {slots:new Array(maxSlots).fill(''), linesUsed:0};
-  const lines = (items.length <= maxSlots) ? items.slice() : _pairAdjacent(items);
+  let lines = _buildAcademyLines(items, 'none');
+  if(lines.length > maxSlots) lines = _buildAcademyLines(items, 'overflow');
+  if(lines.length > maxSlots) lines = _buildAcademyLines(items, 'full');
   if(lines.length > maxSlots) return null;
   const result = new Array(maxSlots).fill('');
   for(let i=0;i<lines.length;i++) result[i] = lines[i];
