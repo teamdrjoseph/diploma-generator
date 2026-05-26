@@ -99,7 +99,7 @@
   },
   {
     "cat": "INTRODUCTION TRAINING",
-    "selectable": false,
+    "selectable": true,
     "items": [
       "GESCHICHTE / PHILOSOPHIE / PRODUKTE",
       "INTRODUCTION TEAM DR JOSEPH METHOD",
