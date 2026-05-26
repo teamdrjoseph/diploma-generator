@@ -152,7 +152,7 @@
 <header>
   <div style="display:flex;align-items:center;gap:12px">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2171.39 178.81" style="height:18px;width:auto"><g><path d="M2135.2,72.14V2.87h36.19V175.93H2135.2V98.75h-41.46v77.18h-36.19V2.87h36.19V72.14Z"/><path d="M1875.39,2.87h65.18c33.08,0,46,20.14,46,51.76,0,19.67-5.76,50.82-48.2,50.82h-26.83v70.48h-36.18Zm36.18,76h20.13c10.78,0,18.23-11.75,18.23-23.25,0-14.15-3.86-26.12-20.14-26.12h-18.22Z"/><path d="M1707.36,175.93V2.87h94.42V29.48h-58.23V72.14h53.7V98.75h-53.7v50.57h60.17v26.61Z"/><path d="M1573.13,178.81c-44.83,0-53.21-26.39-51.3-56.32H1558c0,16.54.75,30.42,20.62,30.42,12.24,0,18.23-7.89,18.23-19.64,0-31.18-72.86-33.09-72.86-84.62C1524,21.57,1537,0,1581,0c35.25,0,52.72,15.82,50.33,52h-35.21c0-12.94-2.17-26.13-16.8-26.13-11.76,0-18.68,6.47-18.68,18.45,0,32.84,72.86,30,72.86,84.37C1633.53,173.53,1600.71,178.81,1573.13,178.81Z"/><path d="M1330.12,89.4c0-45.78,0-89.4,59.65-89.4s59.69,43.62,59.69,89.4c0,45.29,0,89.41-59.69,89.41S1330.12,134.69,1330.12,89.4Zm82.66,0c0-44.34-2.65-63.52-23-63.52s-23,19.18-23,63.52,2.62,63.51,23,63.51S1412.78,133.75,1412.78,89.4Z"/><path d="M1255.31,2.87V135.66c0,30.2-24.43,43.15-50.1,43.15-50.56,0-52.73-21.11-52.73-60.42h36.94c0,13.9-3.11,34.52,15.79,34.52,8.15,0,13.92-7.45,13.92-14.85V2.87Z"/><path d="M1036.65,88.61h-17.92V2.87h33.12c12.22,0,20.07,7.84,20.07,22.45,0,10.92-4.27,19.12-15.91,21v.24c3.9.48,15.56,1.43,15.56,16.86,0,5.45.35,21.62,2,25.17H1056c-2.37-5.23-1.91-11-1.91-16.62,0-10.22,1-18.89-12.83-18.89h-4.62Zm0-48.69h7.95c7.14,0,9.16-7.12,9.16-12.58,0-8.2-3.46-11.28-9.16-11.28h-7.95Z"/><path d="M873.87,2.87h60.4c47.45,0,56.31,31.65,56.31,85.57,0,26.59,4.09,87.49-57.76,87.49h-59Zm36.19,146.45h17.49c22.06,0,26.35-16.54,26.35-59.92,0-31.88,0-59.92-25.14-59.92h-18.7Z"/><path d="M542.88,175.93V2.87h58.23l27.08,117.67h.48L657.43,2.87h56.32V175.93H678.52V42.43H678l-33.31,133.5H610.22L578.59,42.43h-.49v133.5Z"/><path d="M336,175.93,384,2.87h47.69l47,173.06H440.52l-9.58-38.36H381.57l-9.83,34.36Zm69.77-139.74h-.48L388.76,111h34.51Z"/><path d="M181.45,175.93V2.87h94.42V29.48H217.63V72.14h53.69V98.75H217.63v50.57h60.16v26.61Z"/><path d="M116.72,2.87V31.64H76.45V175.93H40.27V31.64H0V2.87Z"/></g></svg>
-    <span class="v-badge">v1</span>
+    <span class="v-badge">v2</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <button class="btn" onclick="openQuick()">⚡ Schnellgenerierung</button>
@@ -791,28 +791,36 @@ const pdfCache={};
 
 /* ── Init ── */
 function init(){
-  loadTrainings();
-  MAPPING_DATA.forEach(e=>{
-    if(e.b) mapping[e.b.trim().toLowerCase()]={diploma:e.d||'',paper:e.p||''};
-  });
-  const sel=document.getElementById('diploma-select');
-  sel.innerHTML='<option value="">— automatisch erkannt —</option>';
-  ALL_DIPLOMAS.forEach(d=>{
-    const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);
-  });
-  // Default date = today, formatted DD.MM.YYYY
-  const today=new Date();
-  const dd=String(today.getDate()).padStart(2,'0');
-  const mm=String(today.getMonth()+1).padStart(2,'0');
-  const yyyy=today.getFullYear();
-  const todayStr=dd+'.'+mm+'.'+yyyy;
-  detectedDate=todayStr;
-  const di=document.getElementById('date-input');
-  if(di) di.value=todayStr;
+  try{ loadTrainings(); }catch(e){console.error('init:loadTrainings failed',e);}
+  try{
+    MAPPING_DATA.forEach(e=>{
+      if(e.b) mapping[e.b.trim().toLowerCase()]={diploma:e.d||'',paper:e.p||''};
+    });
+  }catch(e){console.error('init:mapping failed',e);}
+  try{
+    const sel=document.getElementById('diploma-select');
+    if(sel){
+      sel.innerHTML='<option value="">— automatisch erkannt —</option>';
+      ALL_DIPLOMAS.forEach(d=>{
+        const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);
+      });
+    }
+  }catch(e){console.error('init:diploma select failed',e);}
+  try{
+    // Default date = today, formatted DD.MM.YYYY
+    const today=new Date();
+    const dd=String(today.getDate()).padStart(2,'0');
+    const mm=String(today.getMonth()+1).padStart(2,'0');
+    const yyyy=today.getFullYear();
+    const todayStr=dd+'.'+mm+'.'+yyyy;
+    detectedDate=todayStr;
+    const di=document.getElementById('date-input');
+    if(di) di.value=todayStr;
+  }catch(e){console.error('init:date failed',e);}
   // Render config + summary + table once at start so user sees everything
-  try{ renderDynamicConfig(); }catch(e){}
-  try{ updateSummary(); }catch(e){}
-  try{ renderTable(); }catch(e){}
+  try{ renderDynamicConfig(); }catch(e){console.error('init:renderDynamicConfig failed',e);}
+  try{ updateSummary(); }catch(e){console.error('init:updateSummary failed',e);}
+  try{ renderTable(); }catch(e){console.error('init:renderTable failed',e);}
 }
 
 /* ── Manually add a participant (no ERP import needed) ──
